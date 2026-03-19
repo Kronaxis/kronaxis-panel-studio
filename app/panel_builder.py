@@ -10,7 +10,7 @@ Wraps a 3-pass LLM generation pipeline:
   Pass 2: Populate structured field groups from biography
   Pass 3: Generate questionnaire responses + opinion drift
 
-Uses local Ollama for all LLM calls (no external API keys required).
+Uses a local LLM server for all calls (no external API keys required).
 """
 
 import asyncio
@@ -36,7 +36,7 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_BUILD_MODEL = os.environ.get("OLLAMA_BUILD_MODEL", "") or os.environ.get("OLLAMA_MODEL", "qwen3:4b")
+OLLAMA_BUILD_MODEL = os.environ.get("OLLAMA_BUILD_MODEL", "") or os.environ.get("OLLAMA_MODEL", "")
 BUILD_CONCURRENCY = int(os.environ.get("BUILD_CONCURRENCY", "5"))
 
 DYNAMICS_DIMS = ["D", "Y", "N", "A", "M", "I", "C", "S"]
@@ -219,15 +219,15 @@ def _clear_progress(job_id):
 
 
 # ---------------------------------------------------------------------------
-# Ollama API client (async)
+# LLM API client (async)
 # ---------------------------------------------------------------------------
 
 async def call_ollama(prompt, api_key=None, max_retries=5, temperature=0.8,
                       max_output_tokens=4096, json_mode=True):
-    """Call Ollama API with exponential backoff.
+    """Call the local LLM server API with exponential backoff.
 
     Named call_ollama for compatibility with the 3-pass pipeline callers.
-    Uses Ollama's /api/generate endpoint for single-prompt generation.
+    Uses the /api/generate endpoint for single-prompt generation.
     """
     if not _HAS_AIOHTTP:
         raise RuntimeError("aiohttp required: pip install aiohttp")
@@ -256,12 +256,12 @@ async def call_ollama(prompt, api_key=None, max_retries=5, temperature=0.8,
                 ) as resp:
                     if resp.status == 503:
                         wait = min(2 ** attempt * 4, 60) + random.uniform(0, 2)
-                        log.warning("Ollama busy, retrying in %.1fs (attempt %d)", wait, attempt + 1)
+                        log.warning("LLM server busy, retrying in %.1fs (attempt %d)", wait, attempt + 1)
                         await asyncio.sleep(wait)
                         continue
                     if resp.status != 200:
                         text = await resp.text()
-                        raise RuntimeError(f"Ollama API error {resp.status}: {text[:300]}")
+                        raise RuntimeError(f"LLM API error {resp.status}: {text[:300]}")
                     data = await resp.json()
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             if attempt < max_retries - 1:
@@ -270,16 +270,16 @@ async def call_ollama(prompt, api_key=None, max_retries=5, temperature=0.8,
             raise
 
         content = data.get("response", "")
-        # Strip Qwen3 think tags if present.
+        # Strip think tags if present (some models wrap output in these).
         if "<think>" in content:
             content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
         return content
 
-    raise RuntimeError("Ollama API: max retries exceeded")
+    raise RuntimeError("LLM API: max retries exceeded")
 
 
 def parse_json_response(raw):
-    """Parse JSON from Ollama response, handling markdown fences."""
+    """Parse JSON from LLM response, handling markdown fences."""
     text = raw.strip()
     if text.startswith("```"):
         lines = text.split("\n")
@@ -314,7 +314,7 @@ async def generate_demographic_profile(country, count, demographic_spec=None):
     """Generate a demographic profile for persona generation.
 
     For UK: returns census-weighted defaults.
-    For other countries: asks Ollama to generate plausible distributions.
+    For other countries: asks the LLM to generate plausible distributions.
     """
     if country.lower() in ("united kingdom", "uk", "britain", "great britain"):
         return _uk_profile(count, demographic_spec)
@@ -445,7 +445,7 @@ _COUNTRY_OPTIONS_CACHE = {}
 async def get_country_options(country):
     """Return available filter options for a country's demographic fields.
 
-    For UK: hardcoded. For others: Ollama-generated and cached.
+    For UK: hardcoded. For others: LLM-generated and cached.
     """
     key = country.lower().strip()
     if key in _COUNTRY_OPTIONS_CACHE:
@@ -456,7 +456,7 @@ async def get_country_options(country):
         _COUNTRY_OPTIONS_CACHE[key] = opts
         return opts
 
-    # Generate options via Ollama for any other country.
+    # Generate options via LLM for any other country.
     prompt = f"""For {country}, provide lists of options for building a demographic survey panel.
 
 Return a JSON object with these keys:
@@ -521,7 +521,7 @@ def _uk_options():
 
 
 def _generic_options(country):
-    """Fallback options if Ollama call fails."""
+    """Fallback options if LLM call fails."""
     return {
         "country": country,
         "regions": [],
@@ -1160,7 +1160,7 @@ async def run_build_pipeline(job_id, skeletons, api_key, db_pool, panel_name,
 def start_build_job(job_id, name, country, target_count, demographic_spec, db_pool,
                     api_key=None, simulation_depth="off", persona_guidance=None):
     """Launch a build job in a background thread."""
-    key = api_key  # Retained for interface compatibility; unused by Ollama
+    key = api_key  # Retained for interface compatibility; unused by local LLM
 
     def _run():
         loop = asyncio.new_event_loop()

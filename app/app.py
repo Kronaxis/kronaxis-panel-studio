@@ -6,7 +6,7 @@ Licensed under BSL 1.1. See LICENSE file.
 https://kronaxis.co.uk | contact@kronaxis.co.uk
 
 Standalone Flask service (port 8090) for psychographically accurate consumer panels
-powered by the DYNAMICS-8 personality framework and local Ollama LLM inference.
+powered by the DYNAMICS-8 personality framework and local LLM inference.
 """
 
 import hashlib
@@ -101,7 +101,7 @@ def _seed_if_empty():
 
 _seed_if_empty()
 
-# Response engine (local Ollama-based persona cognition).
+# Response engine (local LLM-based persona cognition).
 response_engine = ResponseEngine(pool)
 
 # SSE subscriber registry: run_id -> list of queue.Queue
@@ -1286,7 +1286,7 @@ def api_generate_focus_group(panel_id, conv_id, turn_number):
                 (run_id, transcript, speaker_count, word_count, model_used)
             VALUES (%s, %s, %s, %s, %s)
         """, (run_id, transcript, speaker_count, word_count,
-              os.environ.get("OLLAMA_MODEL", "qwen3:4b")))
+              os.environ.get("OLLAMA_MODEL", "")))
         conn2.commit()
         cur2.close()
     except Exception as e:
@@ -2173,7 +2173,7 @@ def _format_conjoint_stimulus(attr_names, profile_a, profile_b, choice_num):
 
 @app.route("/api/health", methods=["GET"])
 def api_health():
-    """Return response engine (Ollama) health status."""
+    """Return response engine health status."""
     return jsonify(response_engine.health())
 
 

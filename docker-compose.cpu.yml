@@ -1,4 +1,4 @@
-# CPU-only override: removes GPU reservation from Ollama.
+# CPU-only override: removes GPU reservation from the LLM server.
 # Usage: docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d
 
 services:

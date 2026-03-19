@@ -6,8 +6,8 @@
 # https://kronaxis.co.uk/dynamics
 #
 # Replaces the Animus HTTP proxy with a self-contained persona response
-# generator that calls Ollama directly. This is the standalone version
-# for the open-source Panel Studio distribution.
+# generator that calls a local LLM server directly. This is the standalone
+# version for the open-source Panel Studio distribution.
 
 import json
 import logging
@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:4b")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "")
 MAX_WORKERS = int(os.environ.get("RESPONSE_CONCURRENCY", "4"))
 
 # ---------------------------------------------------------------------------
@@ -126,11 +126,11 @@ Respond naturally as this person. Do not mention DYNAMICS-8 or personality score
 
 
 # ---------------------------------------------------------------------------
-# Ollama API client
+# LLM API client
 # ---------------------------------------------------------------------------
 
 def call_ollama(system_prompt: str, user_prompt: str, model: str = None) -> str:
-    """Send a chat completion request to the Ollama API.
+    """Send a chat completion request to the local LLM server.
 
     Uses the OpenAI-compatible endpoint for broad model support.
     """
@@ -150,22 +150,21 @@ def call_ollama(system_prompt: str, user_prompt: str, model: str = None) -> str:
         },
     }
 
-    # Qwen3 models require thinking mode disabled.
-    if "qwen3" in model.lower() or "qwen-3" in model.lower():
-        payload["options"]["num_predict"] = 512
+    # Some models wrap output in thinking tags; limit output length.
+    payload["options"]["num_predict"] = 512
 
     try:
         resp = requests.post(url, json=payload, timeout=120)
         resp.raise_for_status()
         data = resp.json()
         content = data.get("message", {}).get("content", "")
-        # Strip any <think> tags (Qwen3 safety net).
+        # Strip any <think> tags that some models produce.
         if "<think>" in content:
             import re
             content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
         return content
     except requests.RequestException as e:
-        log.error("Ollama request failed: %s", e)
+        log.error("LLM request failed: %s", e)
         return f"[Response generation failed: {e}]"
 
 
@@ -174,7 +173,7 @@ def call_ollama(system_prompt: str, user_prompt: str, model: str = None) -> str:
 # ---------------------------------------------------------------------------
 
 class ResponseEngine:
-    """Self-contained persona response generator using local Ollama.
+    """Self-contained persona response generator using a local LLM server.
 
     Replaces the Animus HTTP proxy for the standalone Panel Studio.
     """
@@ -546,7 +545,7 @@ class ResponseEngine:
             self._put_conn(conn)
 
     def health(self) -> dict:
-        """Check Ollama connectivity and model availability."""
+        """Check LLM server connectivity and model availability."""
         try:
             resp = requests.get(OLLAMA_URL.rstrip("/") + "/api/tags", timeout=5)
             resp.raise_for_status()

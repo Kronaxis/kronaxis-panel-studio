@@ -30,7 +30,7 @@ services:
       - kronaxis-panel-studio
 
   # ---------------------------------------------------------------------------
-  # LLM (Ollama)
+  # LLM Server
   # ---------------------------------------------------------------------------
 
   ollama:
@@ -65,8 +65,8 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        echo "Pulling model ${OLLAMA_MODEL:-qwen3:4b}..."
-        curl -sf http://kps-ollama:11434/api/pull -d "{\"name\":\"${OLLAMA_MODEL:-qwen3:4b}\"}" --max-time 600
+        echo "Pulling model ${OLLAMA_MODEL:?OLLAMA_MODEL is required}..."
+        curl -sf http://kps-ollama:11434/api/pull -d "{\"name\":\"${OLLAMA_MODEL}\"}" --max-time 600
         echo "Model pull complete."
     networks:
       - kronaxis-panel-studio
@@ -84,7 +84,7 @@ services:
       TFS_DB_PASSWORD: ${TFS_DB_PASSWORD}
       FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:?FLASK_SECRET_KEY is required}
       OLLAMA_URL: ${OLLAMA_URL:-http://kps-ollama:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:?OLLAMA_MODEL is required}
       OLLAMA_BUILD_MODEL: ${OLLAMA_BUILD_MODEL:-}
       PANEL_STUDIO_AUTH: ${PANEL_STUDIO_AUTH:-false}
       KRONAXIS_GATE_ENABLED: ${KRONAXIS_GATE_ENABLED:-true}

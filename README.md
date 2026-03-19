@@ -32,7 +32,7 @@ Panel Studio replaces expensive human focus groups with thousands of AI personas
 - **Scheduled stimuli** on cron or interval expressions for longitudinal research
 - **Export** to JSONL, Parquet, and CSV for training data or downstream analysis
 - **Cross-panel comparison** of sentiment across different demographic panels
-- **Runs locally** on Ollama with no data leaving your machine
+- **Runs locally** on a local LLM server with no data leaving your machine
 
 ## Quick Start
 
@@ -55,9 +55,9 @@ Then start everything:
 docker-compose up -d
 ```
 
-Ollama pulls Qwen3-4B (~2.5 GB) automatically on first boot. Monitor progress with `docker logs kps-ollama -f`. Once the model is ready, open [http://localhost:8090](http://localhost:8090), navigate to Panels, select "UK Census Panel", and start a conversation.
+The default language model (~2.5 GB) is pulled automatically on first boot. Monitor progress with `docker logs kps-ollama -f`. Once the model is ready, open [http://localhost:8090](http://localhost:8090), navigate to Panels, select "UK Census Panel", and start a conversation.
 
-**GPU recommended.** Ollama runs on CPU if no GPU is available, but inference will be significantly slower. A GPU with 6 GB+ VRAM is recommended for interactive use.
+**GPU recommended.** The LLM server runs on CPU if no GPU is available, but inference will be significantly slower. A GPU with 6 GB+ VRAM is recommended for interactive use.
 
 ## API
 
@@ -124,8 +124,8 @@ curl "http://localhost:8090/api/panels/$PANEL_ID/conversations/$CONV_ID/export?f
            +------------+------------+
            |                         |
   +--------v---------+     +---------v--------+
-  |   PostgreSQL 15  |     |     Ollama       |
-  |   + pgvector     |     |  (Qwen3-4B)     |
+  |   PostgreSQL 15  |     |   LLM Server     |
+  |   + pgvector     |     |  (local model)   |
   |   port 5432      |     |  port 11434      |
   +---------+--------+     +------------------+
             |
@@ -136,11 +136,11 @@ curl "http://localhost:8090/api/panels/$PANEL_ID/conversations/$CONV_ID/export?f
 | Service | Container | Port | Purpose |
 |---|---|---|---|
 | `panel-studio` | kps-panel-studio | 8090 | Flask web application and API |
-| `ollama` | kps-ollama | 11434 | Local LLM inference |
+| `ollama` | kps-ollama | 11434 | Local LLM inference server |
 | `db` | kps-db | 5432 | PostgreSQL 15 with pgvector |
-| `model-pull` | kps-model-pull | -- | One-shot init container; pulls the Ollama model |
+| `model-pull` | kps-model-pull | -- | One-shot init container; pulls the default model |
 
-**How a stimulus flows:** you submit a question to a panel. Panel Studio loads each persona's DYNAMICS-8 profile, life narrative, and conversation memory into a personalised prompt. Ollama generates a response shaped by that persona's personality. Responses are aggregated by age, gender, region, and personality segment. The result is a demographically broken-down sentiment report with individual-level data available for export.
+**How a stimulus flows:** you submit a question to a panel. Panel Studio loads each persona's DYNAMICS-8 profile, life narrative, and conversation memory into a personalised prompt. The LLM generates a response shaped by that persona's personality. Responses are aggregated by age, gender, region, and personality segment. The result is a demographically broken-down sentiment report with individual-level data available for export.
 
 ## DYNAMICS-8
 
@@ -173,7 +173,7 @@ All configuration is via environment variables in `.env`. See [.env.example](.en
 |---|---|---|---|
 | `TFS_DB_PASSWORD` | Yes | -- | PostgreSQL password |
 | `FLASK_SECRET_KEY` | Yes | -- | Flask session secret |
-| `OLLAMA_MODEL` | No | `qwen3:4b` | Ollama model for persona responses |
+| `OLLAMA_MODEL` | No | (see .env.example) | Language model for persona responses |
 | `OLLAMA_BUILD_MODEL` | No | -- | Separate (larger) model for panel building |
 | `PANEL_STUDIO_AUTH` | No | `false` | Enable session-based login and multi-tenancy |
 | `KRONAXIS_GATE_ENABLED` | No | `true` | Require free Kronaxis account for exports and building |

@@ -215,7 +215,7 @@ CREATE INDEX IF NOT EXISTS idx_focus_group_run ON panel_focus_group_transcripts(
 
 CREATE TABLE IF NOT EXISTS llm_call_log (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    provider TEXT DEFAULT 'ollama',
+    provider TEXT DEFAULT 'local',
     model TEXT,
     input_tokens INTEGER,
     output_tokens INTEGER,
@@ -234,7 +234,7 @@ CREATE INDEX IF NOT EXISTS idx_llm_call_log_created ON llm_call_log(created_at);
 
 CREATE TABLE IF NOT EXISTS panel_gpu_usage (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    provider TEXT DEFAULT 'ollama',
+    provider TEXT DEFAULT 'local',
     instance_id TEXT,
     gpu_type TEXT,
     hourly_rate NUMERIC(10,4) DEFAULT 0,
