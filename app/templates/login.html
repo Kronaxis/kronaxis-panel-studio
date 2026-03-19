@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — Panel Studio</title>
+    <link rel="stylesheet" href="/static/css/panel-studio.css">
+    <style>
+        body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg); }
+        .login-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:2rem; width:100%; max-width:380px; }
+        .login-card h2 { text-align:center; margin-bottom:0.25rem; }
+        .login-card .subtitle { text-align:center; color:var(--text-muted); font-size:0.85rem; margin-bottom:1.5rem; }
+        .tab-row { display:flex; margin-bottom:1.5rem; border-bottom:1px solid var(--border); }
+        .tab-btn { flex:1; padding:0.6rem; text-align:center; cursor:pointer; color:var(--text-muted); font-size:0.9rem; border-bottom:2px solid transparent; transition:color 0.2s, border-color 0.2s; background:none; border-top:none; border-left:none; border-right:none; }
+        .tab-btn.active { color:var(--forge); border-bottom-color:var(--forge); }
+        .error-msg { background:var(--danger); color:#fff; padding:0.5rem 0.75rem; border-radius:6px; font-size:0.85rem; margin-bottom:1rem; display:none; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h2 style="color:var(--forge);">Panel Studio</h2>
+        <div class="subtitle">Kronaxis Causal Data Platform</div>
+
+        <div class="tab-row">
+            <button class="tab-btn active" onclick="showTab('login')">Login</button>
+            <button class="tab-btn" onclick="showTab('register')">Register</button>
+        </div>
+
+        <div id="error-msg" class="error-msg"></div>
+
+        <div id="login-form">
+            <div class="form-group">
+                <label>Email</label>
+                <input type="text" id="login-email" placeholder="you@example.com">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="Password">
+            </div>
+            <button class="btn btn-primary" style="width:100%;" onclick="doLogin()">Sign In</button>
+        </div>
+
+        <div id="register-form" style="display:none;">
+            <div class="form-group">
+                <label>Display name</label>
+                <input type="text" id="reg-name" placeholder="Your name">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="text" id="reg-email" placeholder="you@example.com">
+            </div>
+            <div class="form-group">
+                <label>Password (8+ characters)</label>
+                <input type="password" id="reg-password" placeholder="Password">
+            </div>
+            <button class="btn btn-primary" style="width:100%;" onclick="doRegister()">Create Account</button>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tab) {
+            document.getElementById('login-form').style.display = tab === 'login' ? '' : 'none';
+            document.getElementById('register-form').style.display = tab === 'register' ? '' : 'none';
+            document.querySelectorAll('.tab-btn').forEach((b, i) => {
+                b.classList.toggle('active', (tab === 'login' && i === 0) || (tab === 'register' && i === 1));
+            });
+            document.getElementById('error-msg').style.display = 'none';
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('error-msg');
+            el.textContent = msg;
+            el.style.display = '';
+        }
+
+        async function doLogin() {
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+            if (!email || !password) { showError('Email and password required'); return; }
+
+            const resp = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email, password})
+            });
+            if (resp.ok) {
+                window.location.href = '/';
+            } else {
+                const err = await resp.json();
+                showError(err.error || 'Login failed');
+            }
+        }
+
+        async function doRegister() {
+            const display_name = document.getElementById('reg-name').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const password = document.getElementById('reg-password').value;
+            if (!email || !password) { showError('Email and password required'); return; }
+
+            const resp = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email, password, display_name})
+            });
+            if (resp.ok) {
+                window.location.href = '/';
+            } else {
+                const err = await resp.json();
+                showError(err.error || 'Registration failed');
+            }
+        }
+
+        // Enter key submits.
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                if (document.getElementById('login-form').style.display !== 'none') doLogin();
+                else doRegister();
+            }
+        });
+    </script>
+</body>
+</html>

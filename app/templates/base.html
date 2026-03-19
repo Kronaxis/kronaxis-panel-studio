@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Panel Studio{% endblock %} — Kronaxis</title>
+    <link rel="stylesheet" href="/static/css/panel-studio.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-brand">
+            <h1>Panel Studio</h1>
+            <span>Kronaxis | DYNAMICS-8</span>
+        </div>
+        <ul class="sidebar-nav">
+            <li><a href="/" {% if request.path == '/' %}class="active"{% endif %}>Dashboard</a></li>
+            <li><a href="/panels" {% if '/panels' in request.path %}class="active"{% endif %}>Panels</a></li>
+            <li><a href="/build" {% if request.path == '/build' %}class="active"{% endif %}>Build</a></li>
+            <li><a href="/compare" {% if request.path == '/compare' %}class="active"{% endif %}>Compare</a></li>
+            <li><a href="/costs" {% if request.path == '/costs' %}class="active"{% endif %}>Costs</a></li>
+        </ul>
+        {% if session.get('user_name') %}
+        <div style="position:absolute; bottom:3.5rem; left:0; right:0; padding:0 1.25rem;">
+            <div style="font-size:0.8rem; color:var(--text-muted);">{{ session.user_name }}</div>
+            <a href="/logout" style="font-size:0.75rem; color:var(--text-muted);">Sign out</a>
+        </div>
+        {% endif %}
+        <div style="position:absolute; bottom:0.5rem; left:0; right:0; padding:0 1.25rem; text-align:center;">
+            <a href="https://kronaxis.co.uk" target="_blank" style="font-size:0.65rem; color:var(--text-muted); text-decoration:none;">
+                Powered by Kronaxis | BSL 1.1 Licensed
+            </a>
+        </div>
+    </nav>
+
+    <div class="main">
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

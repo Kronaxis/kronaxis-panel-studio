@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}Conjoint Analysis{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+    <div>
+        <a href="/panels/{{ panel_id }}" style="color:var(--text-muted); font-size:0.8rem;">Back to panel</a>
+        <h2 style="margin-top:0.25rem;">Conjoint Analysis</h2>
+    </div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+    <div class="card">
+        <h3>Design Study</h3>
+        <div class="form-group">
+            <label>Study name</label>
+            <input type="text" id="cj-name" placeholder="e.g. Smartphone preference study">
+        </div>
+
+        <div id="attr-list">
+            <div class="form-group attr-row" data-idx="0">
+                <label>Attribute 1</label>
+                <input type="text" class="attr-name" placeholder="e.g. Price">
+                <input type="text" class="attr-levels" placeholder="Levels (comma-separated): e.g. £299, £499, £799" style="margin-top:0.35rem;">
+            </div>
+            <div class="form-group attr-row" data-idx="1">
+                <label>Attribute 2</label>
+                <input type="text" class="attr-name" placeholder="e.g. Brand">
+                <input type="text" class="attr-levels" placeholder="Levels: e.g. Apple, Samsung, Google" style="margin-top:0.35rem;">
+            </div>
+        </div>
+
+        <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+            <button class="btn btn-ghost" style="font-size:0.8rem;" onclick="addAttribute()">+ Add Attribute</button>
+        </div>
+
+        <button class="btn btn-primary" onclick="createStudy()">Create Study</button>
+    </div>
+
+    <div class="card">
+        <h3>Studies</h3>
+        <div id="study-list"></div>
+    </div>
+</div>
+
+<div class="card" id="study-detail" style="display:none; margin-top:1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 id="detail-name">Study Detail</h3>
+        <div>
+            <span id="detail-status" class="badge"></span>
+            <button class="btn btn-primary" style="margin-left:0.5rem;" id="run-btn" onclick="runStudy()">Run Study</button>
+        </div>
+    </div>
+    <div style="margin-top:1rem;">
+        <h3 style="font-size:0.9rem;">Attributes</h3>
+        <div id="detail-attrs"></div>
+    </div>
+    <div style="margin-top:1rem;">
+        <h3 style="font-size:0.9rem;">Choice Profiles (<span id="profile-count">0</span>)</h3>
+        <div id="detail-profiles" style="max-height:300px; overflow-y:auto;"></div>
+    </div>
+    <div id="detail-results" style="margin-top:1rem; display:none;">
+        <h3 style="font-size:0.9rem;">Results</h3>
+        <div id="results-content"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PANEL_ID = '{{ panel_id }}';
+let attrCount = 2;
+let activeStudyId = null;
+
+function addAttribute() {
+    attrCount++;
+    const el = document.getElementById('attr-list');
+    const div = document.createElement('div');
+    div.className = 'form-group attr-row';
+    div.dataset.idx = attrCount - 1;
+    div.innerHTML = `
+        <label>Attribute ${attrCount}
+            <button class="btn btn-ghost" style="font-size:0.65rem; padding:0.1rem 0.3rem; margin-left:0.5rem; color:var(--danger);" onclick="this.closest('.attr-row').remove()">Remove</button>
+        </label>
+        <input type="text" class="attr-name" placeholder="e.g. Screen Size">
+        <input type="text" class="attr-levels" placeholder="Levels (comma-separated)" style="margin-top:0.35rem;">
+    `;
+    el.appendChild(div);
+}
+
+async function createStudy() {
+    const name = document.getElementById('cj-name').value.trim();
+    if (!name) { alert('Study name is required'); return; }
+
+    const rows = document.querySelectorAll('.attr-row');
+    const attributes = [];
+    for (const row of rows) {
+        const attrName = row.querySelector('.attr-name').value.trim();
+        const levelsStr = row.querySelector('.attr-levels').value.trim();
+        if (!attrName || !levelsStr) continue;
+        const levels = levelsStr.split(',').map(s => s.trim()).filter(Boolean);
+        if (levels.length < 2) { alert(`Attribute "${attrName}" needs at least 2 levels`); return; }
+        attributes.push({name: attrName, levels});
+    }
+
+    if (attributes.length < 2) { alert('At least 2 attributes required'); return; }
+
+    const resp = await fetch(`/api/panels/${PANEL_ID}/conjoint`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, attributes})
+    });
+    if (resp.ok) {
+        loadStudies();
+        const study = await resp.json();
+        showStudyDetail(study.id);
+    } else {
+        const err = await resp.json();
+        alert(err.error || 'Failed to create study');
+    }
+}
+
+async function loadStudies() {
+    const resp = await fetch(`/api/panels/${PANEL_ID}/conjoint`);
+    if (!resp.ok) return;
+    const studies = await resp.json();
+    const el = document.getElementById('study-list');
+    if (!studies.length) {
+        el.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">No studies yet. Create one using the form.</p>';
+        return;
+    }
+    el.innerHTML = studies.map(s => `
+        <div class="card" style="cursor:pointer; margin-bottom:0.5rem;" onclick="showStudyDetail('${s.id}')">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:600; font-size:0.9rem;">${s.name}</span>
+                <span class="badge badge-${s.status === 'complete' ? 'complete' : s.status === 'running' ? 'active' : 'neutral'}">${s.status}</span>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">${s.created_at ? new Date(s.created_at).toLocaleDateString() : ''}</div>
+        </div>
+    `).join('');
+}
+
+async function showStudyDetail(studyId) {
+    activeStudyId = studyId;
+    const resp = await fetch(`/api/panels/${PANEL_ID}/conjoint/${studyId}`);
+    if (!resp.ok) return;
+    const study = await resp.json();
+
+    document.getElementById('study-detail').style.display = '';
+    document.getElementById('detail-name').textContent = study.name;
+    document.getElementById('detail-status').textContent = study.status;
+    document.getElementById('detail-status').className = `badge badge-${study.status === 'complete' ? 'complete' : study.status === 'running' ? 'active' : 'neutral'}`;
+
+    const runBtn = document.getElementById('run-btn');
+    runBtn.style.display = study.status === 'draft' ? '' : 'none';
+
+    // Attributes.
+    const attrs = study.attributes || [];
+    document.getElementById('detail-attrs').innerHTML = attrs.map(a =>
+        `<div style="margin-bottom:0.35rem; font-size:0.85rem;"><strong>${a.name}:</strong> ${a.levels.join(', ')}</div>`
+    ).join('');
+
+    // Profiles.
+    const profiles = study.profiles || [];
+    document.getElementById('profile-count').textContent = profiles.length;
+    const attrNames = attrs.map(a => a.name);
+    document.getElementById('detail-profiles').innerHTML = `
+        <table>
+            <thead><tr>${attrNames.map(n => `<th>${n}</th>`).join('')}</tr></thead>
+            <tbody>${profiles.map((p, i) => {
+                const bg = (i % 4 < 2) ? '' : 'style="background:var(--surface);"';
+                const pair = Math.floor(i / 2) + 1;
+                const label = i % 2 === 0 ? 'A' : 'B';
+                return `<tr ${bg}><td style="font-size:0.7rem; color:var(--text-muted);">Set ${pair}${label}</td>${p.map(v => `<td>${v}</td>`).join('')}</tr>`;
+            }).join('')}</tbody>
+        </table>
+    `;
+
+    // Results.
+    if (study.conversation_id && study.status !== 'draft') {
+        document.getElementById('detail-results').style.display = '';
+        document.getElementById('results-content').innerHTML = `
+            <a href="/panels/${PANEL_ID}/conversations/${study.conversation_id}" class="btn btn-panel">View Conversation</a>
+        `;
+    }
+}
+
+async function runStudy() {
+    if (!activeStudyId) return;
+    const resp = await fetch(`/api/panels/${PANEL_ID}/conjoint/${activeStudyId}/run`, {method: 'POST'});
+    if (resp.ok) {
+        const result = await resp.json();
+        alert(`Conjoint study submitted: ${result.choice_sets} choice sets. View the conversation for results.`);
+        showStudyDetail(activeStudyId);
+        loadStudies();
+    } else {
+        const err = await resp.json();
+        alert(err.error || 'Failed to run study');
+    }
+}
+
+loadStudies();
+</script>
+{% endblock %}

@@ -1,0 +1,111 @@
+# Kronaxis Panel Studio - Docker Compose
+# Simulate psychographically accurate consumer panels with open-source AI.
+# Copyright (c) 2026 Kronaxis Limited. All rights reserved.
+# https://kronaxis.co.uk | contact@kronaxis.co.uk
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure
+  # ---------------------------------------------------------------------------
+
+  db:
+    build:
+      context: ./deploy/db
+    container_name: kps-db
+    environment:
+      POSTGRES_DB: tfs
+      POSTGRES_USER: titan
+      POSTGRES_PASSWORD: ${TFS_DB_PASSWORD:?TFS_DB_PASSWORD is required}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U titan -d tfs"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - kronaxis-panel-studio
+
+  # ---------------------------------------------------------------------------
+  # LLM (Ollama)
+  # ---------------------------------------------------------------------------
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: kps-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks:
+      - kronaxis-panel-studio
+
+  # Pull the default model on first boot. Exits once complete.
+  model-pull:
+    image: curlimages/curl:latest
+    container_name: kps-model-pull
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Pulling model ${OLLAMA_MODEL:-qwen3:4b}..."
+        curl -sf http://kps-ollama:11434/api/pull -d "{\"name\":\"${OLLAMA_MODEL:-qwen3:4b}\"}" --max-time 600
+        echo "Model pull complete."
+    networks:
+      - kronaxis-panel-studio
+
+  # ---------------------------------------------------------------------------
+  # Panel Studio
+  # ---------------------------------------------------------------------------
+
+  panel-studio:
+    build:
+      context: ./app
+    container_name: kps-panel-studio
+    environment:
+      DATABASE_URL: postgresql://titan:${TFS_DB_PASSWORD}@kps-db:5432/tfs
+      TFS_DB_PASSWORD: ${TFS_DB_PASSWORD}
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:?FLASK_SECRET_KEY is required}
+      OLLAMA_URL: ${OLLAMA_URL:-http://kps-ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
+      OLLAMA_BUILD_MODEL: ${OLLAMA_BUILD_MODEL:-}
+      PANEL_STUDIO_AUTH: ${PANEL_STUDIO_AUTH:-false}
+      KRONAXIS_GATE_ENABLED: ${KRONAXIS_GATE_ENABLED:-true}
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./seed/personas.jsonl:/seed/personas.jsonl:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      model-pull:
+        condition: service_completed_successfully
+    networks:
+      - kronaxis-panel-studio
+
+volumes:
+  pgdata:
+  ollama-data:
+
+networks:
+  kronaxis-panel-studio:
+    driver: bridge

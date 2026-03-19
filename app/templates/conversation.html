@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Conversation{% endblock %}
+
+{% block head %}
+<style>
+    .main { padding: 0; max-width: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="split-layout">
+    <div class="split-left">
+        <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <a href="/panels/{{ panel_id }}" style="color:var(--text-muted); font-size:0.8rem;">Back to panel</a>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <h3 style="margin:0.25rem 0 0;" id="conv-title">Loading...</h3>
+                    <button class="btn btn-ghost" style="font-size:0.7rem; padding:0.15rem 0.4rem; margin-top:0.25rem;" onclick="renameConversation()">Rename</button>
+                </div>
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <span id="conv-cost" style="color:var(--forge); font-size:0.85rem; font-weight:600;"></span>
+                <span id="turn-counter" style="color:var(--text-muted); font-size:0.85rem;"></span>
+                <div id="export-menu" style="display:none; position:relative;">
+                    <button class="btn btn-data" style="font-size:0.8rem;" onclick="event.stopPropagation(); document.getElementById('export-dropdown').classList.toggle('active')">Export</button>
+                    <div id="export-dropdown" class="export-dropdown-menu" style="position:absolute; right:0; top:100%; margin-top:0.25rem; background:var(--card); border:1px solid var(--border); border-radius:6px; min-width:200px; z-index:50; padding:0.25rem 0;">
+                        <a id="export-jsonl" href="#" style="display:block; padding:0.5rem 0.75rem; font-size:0.8rem; color:var(--text);">Responses (JSONL)</a>
+                        <a id="export-jsonl-full" href="#" style="display:block; padding:0.5rem 0.75rem; font-size:0.8rem; color:var(--text);">Responses + Focus Groups (JSONL)</a>
+                        <a id="export-focus-group" href="#" style="display:block; padding:0.5rem 0.75rem; font-size:0.8rem; color:var(--text);">Focus Groups Only (JSONL)</a>
+                        <a id="export-csv" href="#" style="display:block; padding:0.5rem 0.75rem; font-size:0.8rem; color:var(--text); border-top:1px solid var(--border);">Summary (CSV)</a>
+                    </div>
+                </div>
+                <style>
+                    .export-dropdown-menu { display:none; }
+                    .export-dropdown-menu.active { display:block; }
+                    .export-dropdown-menu a:hover { background:var(--surface); text-decoration:none; }
+                </style>
+                <script>
+                    document.addEventListener('click', function() {
+                        document.getElementById('export-dropdown').classList.remove('active');
+                    });
+                </script>
+            </div>
+        </div>
+
+        <div class="conversation-thread" id="thread"></div>
+
+        <div class="conversation-input">
+            <textarea id="stimulus-input" placeholder="Ask the panel a question..." rows="2"></textarea>
+            <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                <label style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">Sample size:</label>
+                <input type="number" id="sample-size" value="20" min="1" max="5500" style="width:5rem; padding:0.25rem 0.4rem; font-size:0.85rem; background:var(--bg-secondary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary);">
+                <span style="font-size:0.75rem; color:var(--text-muted);">0 = all</span>
+                <button id="ask-btn" class="btn btn-primary" onclick="askPanel()">Ask Panel</button>
+                <button class="btn btn-ghost" style="font-size:0.8rem;" onclick="showScheduleModal()">Schedule</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="response-viewer" id="response-viewer">
+        <h3>Individual Responses</h3>
+        <p style="color:var(--text-muted); font-size:0.85rem;">Click a response card to view individual persona responses.</p>
+        <div id="individual-responses"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/conversation.js"></script>
+<script>
+    const PANEL_ID = '{{ panel_id }}';
+    const CONV_ID = '{{ conversation_id }}' !== 'None' ? '{{ conversation_id }}' : null;
+    initConversation(PANEL_ID, CONV_ID);
+
+    function showScheduleModal() {
+        let overlay = document.getElementById('schedule-modal-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'schedule-modal-overlay';
+            overlay.className = 'modal-overlay active';
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.remove('active'); };
+            overlay.innerHTML = `
+                <div class="modal" style="max-width:450px;">
+                    <h3>Schedule Recurring Stimulus</h3>
+                    <div class="form-group">
+                        <label>Stimulus text</label>
+                        <textarea id="sched-stimulus" rows="2" placeholder="Question to ask on each run..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Frequency</label>
+                        <select id="sched-freq">
+                            <option value="every 6h">Every 6 hours</option>
+                            <option value="every 12h">Every 12 hours</option>
+                            <option value="@daily" selected>Daily</option>
+                            <option value="@weekly">Weekly</option>
+                            <option value="@monthly">Monthly</option>
+                            <option value="every 30m">Every 30 minutes (testing)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Max runs (0 = unlimited)</label>
+                        <input type="number" id="sched-max" value="10" min="0">
+                    </div>
+                    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                        <button class="btn btn-ghost" onclick="document.getElementById('schedule-modal-overlay').classList.remove('active')">Cancel</button>
+                        <button class="btn btn-primary" onclick="createSchedule()">Create Schedule</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        } else {
+            overlay.classList.add('active');
+        }
+    }
+
+    async function createSchedule() {
+        const stimulus = document.getElementById('sched-stimulus').value.trim();
+        if (!stimulus) { alert('Stimulus is required'); return; }
+
+        const resp = await fetch('/api/schedules', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                panel_id: PANEL_ID,
+                conversation_id: conversationId,
+                stimulus: stimulus,
+                cron_expression: document.getElementById('sched-freq').value,
+                max_runs: parseInt(document.getElementById('sched-max').value) || 0,
+            })
+        });
+
+        if (resp.ok) {
+            document.getElementById('schedule-modal-overlay').classList.remove('active');
+            alert('Schedule created. Stimulus will run automatically.');
+        } else {
+            const err = await resp.json();
+            alert(err.error || 'Failed to create schedule');
+        }
+    }
+</script>
+{% endblock %}

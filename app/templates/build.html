@@ -1,0 +1,899 @@
+{% extends "base.html" %}
+{% block title %}Build Panel{% endblock %}
+
+{% block content %}
+<h2>Build a Panel</h2>
+<p style="color:var(--text-muted); margin-bottom:1rem;">Generate a synthetic persona panel for any country, demographic, or audience segment.</p>
+
+<!-- Free-form description -->
+<div class="card" style="margin-bottom:1rem;">
+    <h3>Describe Your Panel</h3>
+    <p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.5rem;">
+        Describe in plain English who you want in your panel. The system will interpret your description and populate the filters below.
+    </p>
+    <div class="form-group" style="margin-bottom:0.5rem;">
+        <textarea id="freeform-description" rows="3" placeholder="e.g. I'm launching a digital marketing product aimed at SEOs worldwide. Give me a representative mix of people who do SEO at all levels, from junior executives to agency owners."
+                  style="width:100%; resize:vertical;"></textarea>
+    </div>
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+        <button class="btn btn-primary" onclick="interpretDescription()" id="btn-interpret" style="white-space:nowrap;">Interpret</button>
+        <span id="interpret-status" style="font-size:0.8rem; color:var(--text-muted);"></span>
+    </div>
+    <div id="interpret-result" style="display:none; margin-top:0.75rem; padding:0.75rem; background:var(--surface); border-radius:6px; border:1px solid var(--border);">
+        <div id="enhanced-desc-block" style="display:none; margin-bottom:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+                <strong style="font-size:0.85rem; color:var(--forge);">Enhanced brief</strong>
+                <button class="btn" onclick="toggleEnhanced()" id="btn-toggle-enhanced" style="font-size:0.7rem; padding:0.15rem 0.4rem;">hide</button>
+            </div>
+            <div id="enhanced-desc-text" style="font-size:0.8rem; color:var(--text); line-height:1.5; padding:0.5rem; background:var(--bg); border-radius:4px; border:1px solid var(--border);"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+            <strong style="font-size:0.85rem; color:var(--data);">Interpreted specification</strong>
+            <button class="btn" onclick="applyInterpretation()" style="font-size:0.75rem; padding:0.25rem 0.5rem;">Apply to Form</button>
+        </div>
+        <div id="interpret-summary" style="font-size:0.8rem;"></div>
+    </div>
+</div>
+
+<!-- Presets -->
+<div class="card" id="presets-card" style="margin-bottom:1rem;">
+    <h3>Quick Start Presets</h3>
+    <div id="preset-buttons" style="display:flex; flex-wrap:wrap; gap:0.5rem;"></div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+    <!-- Left: Build form -->
+    <div>
+        <!-- Core settings -->
+        <div class="card" style="margin-bottom:1rem;">
+            <h3>Panel Basics</h3>
+            <div class="form-group">
+                <label>Panel name</label>
+                <input type="text" id="build-name" placeholder="e.g. UK Young Professionals">
+            </div>
+            <div class="form-group">
+                <label>Country</label>
+                <div style="display:flex; gap:0.5rem;">
+                    <input type="text" id="build-country" value="United Kingdom" placeholder="Country name" style="flex:1;">
+                    <button class="btn" onclick="loadCountryOptions()" id="btn-load-country" style="white-space:nowrap;">Load Options</button>
+                </div>
+                <span id="country-status" style="font-size:0.75rem; color:var(--text-muted);"></span>
+            </div>
+            <div class="form-group">
+                <label>Panel size</label>
+                <input type="number" id="build-count" value="100" min="10" max="10000">
+                <span style="font-size:0.75rem; color:var(--text-muted);">10 to 10,000 personas</span>
+            </div>
+        </div>
+
+        <!-- Demographics -->
+        <div class="card filter-section" style="margin-bottom:1rem;">
+            <h3 class="section-toggle" onclick="toggleSection(this)">
+                <span class="toggle-arrow">&#9654;</span> Demographics
+            </h3>
+            <div class="section-body" style="display:none;">
+                <div class="form-group">
+                    <label>Age range</label>
+                    <div style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="number" id="f-age-min" placeholder="18" min="0" max="120" style="width:80px;">
+                        <span>to</span>
+                        <input type="number" id="f-age-max" placeholder="90" min="0" max="120" style="width:80px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Gender</label>
+                    <div class="checkbox-group" id="f-genders">
+                        <label class="cb"><input type="checkbox" value="male"> Male</label>
+                        <label class="cb"><input type="checkbox" value="female"> Female</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Ethnicity</label>
+                    <div class="checkbox-group" id="f-ethnicities"></div>
+                </div>
+                <div class="form-group">
+                    <label>Marital status</label>
+                    <div class="checkbox-group" id="f-marital"></div>
+                </div>
+                <div class="form-group">
+                    <label>Disability</label>
+                    <div class="checkbox-group">
+                        <label class="cb"><input type="radio" name="disability" value="any" checked> Any</label>
+                        <label class="cb"><input type="radio" name="disability" value="yes"> With disability</label>
+                        <label class="cb"><input type="radio" name="disability" value="no"> Without disability</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Economics -->
+        <div class="card filter-section" style="margin-bottom:1rem;">
+            <h3 class="section-toggle" onclick="toggleSection(this)">
+                <span class="toggle-arrow">&#9654;</span> Economics &amp; Employment
+            </h3>
+            <div class="section-body" style="display:none;">
+                <div class="form-group">
+                    <label>Income range (<span id="currency-label">GBP</span>)</label>
+                    <div style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="number" id="f-income-min" placeholder="0" min="0" style="width:110px;">
+                        <span>to</span>
+                        <input type="number" id="f-income-max" placeholder="any" min="0" style="width:110px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Education level</label>
+                    <div class="checkbox-group" id="f-education"></div>
+                </div>
+                <div class="form-group">
+                    <label>Employment status</label>
+                    <div class="checkbox-group" id="f-employment"></div>
+                </div>
+                <div class="form-group">
+                    <label>Occupation sector</label>
+                    <div class="checkbox-group" id="f-sectors"></div>
+                </div>
+                <div class="form-group">
+                    <label>Social class</label>
+                    <div class="checkbox-group" id="f-social-class"></div>
+                </div>
+                <div class="form-group">
+                    <label>Housing tenure</label>
+                    <div class="checkbox-group" id="f-housing"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Geography -->
+        <div class="card filter-section" style="margin-bottom:1rem;">
+            <h3 class="section-toggle" onclick="toggleSection(this)">
+                <span class="toggle-arrow">&#9654;</span> Geography
+            </h3>
+            <div class="section-body" style="display:none;">
+                <div class="form-group">
+                    <label>Region / State / Province</label>
+                    <div class="checkbox-group scrollable-checks" id="f-regions"></div>
+                </div>
+                <div class="form-group">
+                    <label>Setting</label>
+                    <div class="checkbox-group" id="f-urban-rural">
+                        <label class="cb"><input type="checkbox" value="Urban"> Urban</label>
+                        <label class="cb"><input type="checkbox" value="Suburban"> Suburban</label>
+                        <label class="cb"><input type="checkbox" value="Rural"> Rural</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Culture & Politics -->
+        <div class="card filter-section" style="margin-bottom:1rem;">
+            <h3 class="section-toggle" onclick="toggleSection(this)">
+                <span class="toggle-arrow">&#9654;</span> Culture &amp; Politics
+            </h3>
+            <div class="section-body" style="display:none;">
+                <div class="form-group">
+                    <label>Religion</label>
+                    <div class="checkbox-group" id="f-religions"></div>
+                </div>
+                <div class="form-group">
+                    <label>Languages</label>
+                    <div class="checkbox-group scrollable-checks" id="f-languages"></div>
+                </div>
+                <div class="form-group">
+                    <label>Political party / leaning</label>
+                    <div class="checkbox-group" id="f-political"></div>
+                </div>
+                <div class="form-group">
+                    <label>Immigration status</label>
+                    <div class="checkbox-group" id="f-immigration">
+                        <label class="cb"><input type="checkbox" value="native"> Native-born</label>
+                        <label class="cb"><input type="checkbox" value="first_generation"> First generation</label>
+                        <label class="cb"><input type="checkbox" value="second_generation"> Second generation</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Immigration origin countries</label>
+                    <div class="checkbox-group scrollable-checks" id="f-imm-origins"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Household -->
+        <div class="card filter-section" style="margin-bottom:1rem;">
+            <h3 class="section-toggle" onclick="toggleSection(this)">
+                <span class="toggle-arrow">&#9654;</span> Household
+            </h3>
+            <div class="section-body" style="display:none;">
+                <div class="form-group">
+                    <label>Household size</label>
+                    <div style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="number" id="f-hh-min" placeholder="any" min="1" max="10" style="width:80px;">
+                        <span>to</span>
+                        <input type="number" id="f-hh-max" placeholder="any" min="1" max="10" style="width:80px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Children</label>
+                    <div class="checkbox-group">
+                        <label class="cb"><input type="radio" name="children" value="any" checked> Any</label>
+                        <label class="cb"><input type="radio" name="children" value="yes"> Has children</label>
+                        <label class="cb"><input type="radio" name="children" value="no"> No children</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JSON override (advanced) -->
+        <div class="card filter-section" style="margin-bottom:1rem;">
+            <h3 class="section-toggle" onclick="toggleSection(this)">
+                <span class="toggle-arrow">&#9654;</span> Advanced: Raw JSON Override
+            </h3>
+            <div class="section-body" style="display:none;">
+                <div class="form-group">
+                    <label>Additional demographic spec (merged with visual filters)</label>
+                    <textarea id="build-spec" rows="4" placeholder='{"custom_field": "value"}'></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Living Personas: Simulation Depth -->
+        <div class="card" style="margin-bottom:1rem; padding:1rem;">
+            <h3 style="margin:0 0 0.5rem;">Simulation Depth</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.75rem;">
+                Controls whether personas "live" between interactions, accumulating news exposure and life events.
+            </p>
+            <div style="display:flex; gap:1rem;">
+                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer;">
+                    <input type="radio" name="sim-depth" value="off" checked> Off
+                </label>
+                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="No extra LLM cost per stimulus. Events and news injected as raw context.">
+                    <input type="radio" name="sim-depth" value="fast"> Fast
+                </label>
+                <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="Adds ~$0.001 per persona per stimulus for narrative synthesis and reasoning traces.">
+                    <input type="radio" name="sim-depth" value="full"> Full
+                </label>
+            </div>
+        </div>
+
+        <input type="hidden" id="persona-guidance" value="">
+        <button class="btn btn-primary" onclick="startBuild()" style="width:100%; padding:0.75rem;">Start Build</button>
+    </div>
+
+    <!-- Right: Progress + Status -->
+    <div>
+        <div class="card" id="build-status-card" style="display:none; margin-bottom:1rem;">
+            <h3>Build Progress</h3>
+            <div id="build-active-status">
+                <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                    <span class="pulse-dot"></span>
+                    <span id="build-phase" style="color:var(--forge); font-weight:600; font-size:0.85rem;">Starting...</span>
+                </div>
+                <div class="progress"><div class="progress-bar" id="build-pbar" style="width:0%"></div></div>
+                <span id="build-pcount" style="font-size:0.8rem; color:var(--text-muted);">0 / 0</span>
+            </div>
+            <div id="build-complete" style="display:none;">
+                <p style="color:var(--data); font-weight:600;">Build complete.</p>
+                <a id="build-panel-link" href="#" class="btn btn-panel" style="margin-top:0.5rem;">View Panel</a>
+            </div>
+            <div id="build-error" style="display:none; color:var(--danger);"></div>
+        </div>
+
+        <!-- Active spec preview -->
+        <div class="card" style="margin-bottom:1rem;">
+            <h3>Active Filters</h3>
+            <div id="spec-preview" style="font-size:0.8rem; color:var(--text-muted);">
+                <em>No filters applied. Census-weighted defaults will be used.</em>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Build History</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Country</th>
+                        <th>Size</th>
+                        <th>Status</th>
+                        <th>Progress</th>
+                    </tr>
+                </thead>
+                <tbody id="build-history"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.section-toggle { cursor:pointer; user-select:none; display:flex; align-items:center; gap:0.5rem; }
+.section-toggle:hover { color:var(--forge); }
+.toggle-arrow { font-size:0.7rem; transition:transform 0.2s; display:inline-block; }
+.toggle-arrow.open { transform:rotate(90deg); }
+.checkbox-group { display:flex; flex-wrap:wrap; gap:0.25rem 0.75rem; }
+.checkbox-group label.cb { font-size:0.85rem; font-weight:400; cursor:pointer; display:flex; align-items:center; gap:0.3rem; }
+.checkbox-group label.cb input { margin:0; }
+.scrollable-checks { max-height:160px; overflow-y:auto; border:1px solid var(--border); border-radius:4px; padding:0.5rem; }
+.filter-section { }
+.form-group { margin-bottom:0.75rem; }
+.form-group label { display:block; margin-bottom:0.25rem; font-weight:600; font-size:0.85rem; }
+#preset-buttons .preset-btn {
+    padding:0.4rem 0.75rem; border:1px solid var(--text-muted); border-radius:6px;
+    background:var(--bg); color:var(--text); cursor:pointer; font-size:0.8rem; transition:all 0.15s;
+}
+#preset-buttons .preset-btn:hover { border-color:var(--forge); color:var(--forge); background:var(--surface); }
+#preset-buttons .preset-btn.active { background:var(--forge); color:#000; border-color:var(--forge); font-weight:600; }
+</style>
+<script>
+const esc = (s) => { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+let activeBuildId = null;
+let buildPoll = null;
+let countryOptions = null;
+let presets = {};
+let lastInterpretation = null;
+
+// ---- Section toggle ----
+function toggleSection(h3) {
+    const body = h3.nextElementSibling;
+    const arrow = h3.querySelector('.toggle-arrow');
+    if (body.style.display === 'none') {
+        body.style.display = '';
+        arrow.classList.add('open');
+    } else {
+        body.style.display = 'none';
+        arrow.classList.remove('open');
+    }
+}
+
+// ---- Populate checkboxes from options array ----
+function populateCheckboxes(containerId, options) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = options.map(o =>
+        `<label class="cb"><input type="checkbox" value="${esc(o)}"> ${esc(o)}</label>`
+    ).join('');
+}
+
+function getChecked(containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return [];
+    return Array.from(el.querySelectorAll('input:checked')).map(i => i.value);
+}
+
+// ---- Load country options ----
+async function loadCountryOptions() {
+    const country = document.getElementById('build-country').value.trim();
+    if (!country) return;
+    const status = document.getElementById('country-status');
+    const btn = document.getElementById('btn-load-country');
+    status.textContent = 'Loading options for ' + country + '...';
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch('/api/build/country-options?country=' + encodeURIComponent(country));
+        if (!resp.ok) throw new Error('Failed to load options');
+        countryOptions = await resp.json();
+
+        // Populate all checkbox groups.
+        populateCheckboxes('f-ethnicities', countryOptions.ethnicities || []);
+        populateCheckboxes('f-marital', countryOptions.marital_statuses || []);
+        populateCheckboxes('f-education', countryOptions.education_levels || []);
+        populateCheckboxes('f-employment', countryOptions.employment_statuses || []);
+        populateCheckboxes('f-sectors', countryOptions.occupation_sectors || []);
+        populateCheckboxes('f-social-class', countryOptions.social_classes || []);
+        populateCheckboxes('f-housing', countryOptions.housing_tenures || []);
+        populateCheckboxes('f-regions', countryOptions.regions || []);
+        populateCheckboxes('f-religions', countryOptions.religions || []);
+        populateCheckboxes('f-languages', countryOptions.languages || []);
+        populateCheckboxes('f-political', countryOptions.political_parties || []);
+        populateCheckboxes('f-imm-origins', countryOptions.immigration_origins || []);
+
+        // Update currency label.
+        const cc = countryOptions.currency_code || countryOptions.currency_symbol || 'USD';
+        document.getElementById('currency-label').textContent = cc;
+
+        status.textContent = 'Options loaded for ' + country;
+        status.style.color = 'var(--data)';
+    } catch (e) {
+        status.textContent = 'Failed to load: ' + e.message;
+        status.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// ---- Presets ----
+async function loadPresets() {
+    try {
+        const resp = await fetch('/api/build/presets');
+        if (!resp.ok) return;
+        presets = await resp.json();
+        const container = document.getElementById('preset-buttons');
+        container.innerHTML = Object.entries(presets).map(([key, p]) =>
+            `<button class="preset-btn" onclick="applyPreset('${key}')" title="${esc(p.description)}">${esc(p.label)}</button>`
+        ).join('');
+    } catch (e) { /* ignore */ }
+}
+
+function applyPreset(key) {
+    const p = presets[key];
+    if (!p) return;
+    const spec = p.spec || {};
+
+    // Clear all checkboxes first.
+    document.querySelectorAll('.checkbox-group input[type=checkbox]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('input[type=radio][value=any]').forEach(r => r.checked = true);
+    document.getElementById('f-age-min').value = '';
+    document.getElementById('f-age-max').value = '';
+    document.getElementById('f-income-min').value = '';
+    document.getElementById('f-income-max').value = '';
+    document.getElementById('f-hh-min').value = '';
+    document.getElementById('f-hh-max').value = '';
+
+    // Apply spec values.
+    if (spec.age_min) document.getElementById('f-age-min').value = spec.age_min;
+    if (spec.age_max) document.getElementById('f-age-max').value = spec.age_max;
+    if (spec.income_min) document.getElementById('f-income-min').value = spec.income_min;
+    if (spec.income_max) document.getElementById('f-income-max').value = spec.income_max;
+    if (spec.household_size_min) document.getElementById('f-hh-min').value = spec.household_size_min;
+    if (spec.household_size_max) document.getElementById('f-hh-max').value = spec.household_size_max;
+
+    function checkValues(containerId, values) {
+        if (!values) return;
+        const el = document.getElementById(containerId);
+        if (!el) return;
+        el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+            cb.checked = values.includes(cb.value);
+        });
+    }
+
+    checkValues('f-genders', spec.genders);
+    checkValues('f-ethnicities', spec.ethnicities);
+    checkValues('f-marital', spec.marital_statuses);
+    checkValues('f-education', spec.education_levels);
+    checkValues('f-employment', spec.employment_statuses);
+    checkValues('f-sectors', spec.occupation_sectors);
+    checkValues('f-social-class', spec.social_classes);
+    checkValues('f-housing', spec.housing_tenures);
+    checkValues('f-regions', spec.regions);
+    checkValues('f-urban-rural', spec.urban_rural);
+    checkValues('f-religions', spec.religions);
+    checkValues('f-languages', spec.languages);
+    checkValues('f-political', spec.political_parties);
+    checkValues('f-immigration', spec.immigration_statuses);
+    checkValues('f-imm-origins', spec.immigration_origins);
+
+    if (spec.has_children === true) {
+        document.querySelector('input[name=children][value=yes]').checked = true;
+    } else if (spec.has_children === false) {
+        document.querySelector('input[name=children][value=no]').checked = true;
+    }
+    if (spec.disability === true) {
+        document.querySelector('input[name=disability][value=yes]').checked = true;
+    } else if (spec.disability === false) {
+        document.querySelector('input[name=disability][value=no]').checked = true;
+    }
+
+    // Highlight active preset button.
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector(`.preset-btn[onclick="applyPreset('${key}')"]`);
+    if (btn) btn.classList.add('active');
+
+    // Open sections that have active filters.
+    openSectionsWithFilters();
+    updateSpecPreview();
+}
+
+function openSectionsWithFilters() {
+    document.querySelectorAll('.filter-section').forEach(section => {
+        const body = section.querySelector('.section-body');
+        const hasChecked = body.querySelectorAll('input:checked:not([value=any])').length > 0;
+        const hasValue = Array.from(body.querySelectorAll('input[type=number]')).some(i => i.value);
+        if (hasChecked || hasValue) {
+            body.style.display = '';
+            section.querySelector('.toggle-arrow').classList.add('open');
+        }
+    });
+}
+
+// ---- Assemble spec from UI ----
+function assembleSpec() {
+    const spec = {};
+
+    const ageMin = parseInt(document.getElementById('f-age-min').value);
+    const ageMax = parseInt(document.getElementById('f-age-max').value);
+    if (ageMin > 0) spec.age_min = ageMin;
+    if (ageMax > 0) spec.age_max = ageMax;
+
+    const genders = getChecked('f-genders');
+    if (genders.length) spec.genders = genders;
+
+    const ethnicities = getChecked('f-ethnicities');
+    if (ethnicities.length) spec.ethnicities = ethnicities;
+
+    const marital = getChecked('f-marital');
+    if (marital.length) spec.marital_statuses = marital;
+
+    const disability = document.querySelector('input[name=disability]:checked').value;
+    if (disability === 'yes') spec.disability = true;
+    else if (disability === 'no') spec.disability = false;
+
+    const incMin = parseInt(document.getElementById('f-income-min').value);
+    const incMax = parseInt(document.getElementById('f-income-max').value);
+    if (incMin > 0) spec.income_min = incMin;
+    if (incMax > 0) spec.income_max = incMax;
+
+    const education = getChecked('f-education');
+    if (education.length) spec.education_levels = education;
+
+    const employment = getChecked('f-employment');
+    if (employment.length) spec.employment_statuses = employment;
+
+    const sectors = getChecked('f-sectors');
+    if (sectors.length) spec.occupation_sectors = sectors;
+
+    const socialClass = getChecked('f-social-class');
+    if (socialClass.length) spec.social_classes = socialClass;
+
+    const housing = getChecked('f-housing');
+    if (housing.length) spec.housing_tenures = housing;
+
+    const regions = getChecked('f-regions');
+    if (regions.length) spec.regions = regions;
+
+    const urbanRural = getChecked('f-urban-rural');
+    if (urbanRural.length) spec.urban_rural = urbanRural;
+
+    const religions = getChecked('f-religions');
+    if (religions.length) spec.religions = religions;
+
+    const languages = getChecked('f-languages');
+    if (languages.length) spec.languages = languages;
+
+    const political = getChecked('f-political');
+    if (political.length) spec.political_parties = political;
+
+    const immigration = getChecked('f-immigration');
+    if (immigration.length) spec.immigration_statuses = immigration;
+
+    const immOrigins = getChecked('f-imm-origins');
+    if (immOrigins.length) spec.immigration_origins = immOrigins;
+
+    const hhMin = parseInt(document.getElementById('f-hh-min').value);
+    const hhMax = parseInt(document.getElementById('f-hh-max').value);
+    if (hhMin > 0) spec.household_size_min = hhMin;
+    if (hhMax > 0) spec.household_size_max = hhMax;
+
+    const children = document.querySelector('input[name=children]:checked').value;
+    if (children === 'yes') spec.has_children = true;
+    else if (children === 'no') spec.has_children = false;
+
+    // Merge raw JSON override.
+    const rawJson = document.getElementById('build-spec').value.trim();
+    if (rawJson) {
+        try {
+            const extra = JSON.parse(rawJson);
+            Object.assign(spec, extra);
+        } catch (e) { /* will be caught at submit */ }
+    }
+
+    return spec;
+}
+
+// ---- Spec preview ----
+function updateSpecPreview() {
+    const spec = assembleSpec();
+    const el = document.getElementById('spec-preview');
+    const keys = Object.keys(spec);
+    if (keys.length === 0) {
+        el.innerHTML = '<em>No filters applied. Census-weighted defaults will be used.</em>';
+        return;
+    }
+    const lines = [];
+    if (spec.age_min || spec.age_max) lines.push(`Age: ${spec.age_min || '0'} - ${spec.age_max || 'any'}`);
+    if (spec.genders) lines.push(`Gender: ${spec.genders.join(', ')}`);
+    if (spec.ethnicities) lines.push(`Ethnicity: ${spec.ethnicities.join(', ')}`);
+    if (spec.education_levels) lines.push(`Education: ${spec.education_levels.join(', ')}`);
+    if (spec.employment_statuses) lines.push(`Employment: ${spec.employment_statuses.join(', ')}`);
+    if (spec.income_min || spec.income_max) lines.push(`Income: ${spec.income_min || '0'} - ${spec.income_max || 'any'}`);
+    if (spec.occupation_sectors) lines.push(`Sectors: ${spec.occupation_sectors.join(', ')}`);
+    if (spec.social_classes) lines.push(`Class: ${spec.social_classes.join(', ')}`);
+    if (spec.housing_tenures) lines.push(`Housing: ${spec.housing_tenures.join(', ')}`);
+    if (spec.regions) lines.push(`Regions: ${spec.regions.join(', ')}`);
+    if (spec.urban_rural) lines.push(`Setting: ${spec.urban_rural.join(', ')}`);
+    if (spec.religions) lines.push(`Religion: ${spec.religions.join(', ')}`);
+    if (spec.languages) lines.push(`Languages: ${spec.languages.join(', ')}`);
+    if (spec.political_parties) lines.push(`Political: ${spec.political_parties.join(', ')}`);
+    if (spec.immigration_statuses) lines.push(`Immigration: ${spec.immigration_statuses.join(', ')}`);
+    if (spec.immigration_origins) lines.push(`Origins: ${spec.immigration_origins.join(', ')}`);
+    if (spec.disability === true) lines.push('Disability: yes');
+    if (spec.disability === false) lines.push('Disability: no');
+    if (spec.has_children === true) lines.push('Has children: yes');
+    if (spec.has_children === false) lines.push('Has children: no');
+    if (spec.household_size_min || spec.household_size_max) lines.push(`Household: ${spec.household_size_min || '1'} - ${spec.household_size_max || 'any'}`);
+    el.innerHTML = lines.map(l => `<div style="margin-bottom:0.2rem;">${esc(l)}</div>`).join('');
+}
+
+// Listen for changes on all filter inputs.
+document.addEventListener('change', (e) => {
+    if (e.target.closest('.filter-section') || e.target.closest('#build-spec')) {
+        updateSpecPreview();
+    }
+});
+document.addEventListener('input', (e) => {
+    if (e.target.type === 'number' && e.target.closest('.filter-section')) {
+        updateSpecPreview();
+    }
+});
+
+// ---- Free-form interpretation ----
+function toggleEnhanced() {
+    const text = document.getElementById('enhanced-desc-text');
+    const btn = document.getElementById('btn-toggle-enhanced');
+    if (text.style.display === 'none') {
+        text.style.display = '';
+        btn.textContent = 'hide';
+    } else {
+        text.style.display = 'none';
+        btn.textContent = 'show';
+    }
+}
+
+async function interpretDescription() {
+    const desc = document.getElementById('freeform-description').value.trim();
+    if (!desc) { alert('Enter a description first'); return; }
+
+    const btn = document.getElementById('btn-interpret');
+    const status = document.getElementById('interpret-status');
+    btn.disabled = true;
+    status.textContent = 'Enhancing description and interpreting...';
+    status.style.color = 'var(--text-muted)';
+
+    try {
+        const resp = await fetch('/api/build/interpret', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({description: desc})
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.error || 'Interpretation failed');
+        }
+        lastInterpretation = await resp.json();
+
+        // Show enhanced description if present.
+        const enhancedBlock = document.getElementById('enhanced-desc-block');
+        const enhancedText = document.getElementById('enhanced-desc-text');
+        if (lastInterpretation.enhanced_description) {
+            enhancedBlock.style.display = '';
+            enhancedText.textContent = lastInterpretation.enhanced_description;
+        } else {
+            enhancedBlock.style.display = 'none';
+        }
+
+        // Show summary.
+        const resultDiv = document.getElementById('interpret-result');
+        const summaryDiv = document.getElementById('interpret-summary');
+        resultDiv.style.display = '';
+
+        const lines = [];
+        if (lastInterpretation.name) lines.push(`<strong>Name:</strong> ${esc(lastInterpretation.name)}`);
+        if (lastInterpretation.country) lines.push(`<strong>Country:</strong> ${esc(lastInterpretation.country)}`);
+        if (lastInterpretation.panel_size) lines.push(`<strong>Suggested size:</strong> ${lastInterpretation.panel_size}`);
+        const spec = lastInterpretation.demographic_spec || {};
+        if (spec.age_min || spec.age_max) lines.push(`<strong>Age:</strong> ${spec.age_min || '18'} - ${spec.age_max || 'any'}`);
+        if (spec.education_levels) lines.push(`<strong>Education:</strong> ${spec.education_levels.join(', ')}`);
+        if (spec.employment_statuses) lines.push(`<strong>Employment:</strong> ${spec.employment_statuses.join(', ')}`);
+        const occs = lastInterpretation.custom_occupations || spec.custom_occupations || [];
+        if (occs.length) lines.push(`<strong>Occupations (${occs.length}):</strong> ${occs.map(o => Array.isArray(o) ? o[0] : o).join(', ')}`);
+        if (lastInterpretation.persona_guidance) lines.push(`<strong>Context:</strong> <em>${esc(lastInterpretation.persona_guidance.substring(0, 200))}${lastInterpretation.persona_guidance.length > 200 ? '...' : ''}</em>`);
+        const biases = lastInterpretation.dynamics_biases || {};
+        if (Object.keys(biases).length) {
+            const biasStrs = Object.entries(biases).map(([k, v]) => `${k}: ${v.min}-${v.max}`);
+            lines.push(`<strong>DYNAMICS-8 biases:</strong> ${biasStrs.join(', ')}`);
+        }
+        summaryDiv.innerHTML = lines.map(l => `<div style="margin-bottom:0.3rem;">${l}</div>`).join('');
+
+        status.textContent = 'Interpreted. Click "Apply to Form" to populate filters, then review and build.';
+        status.style.color = 'var(--data)';
+    } catch (e) {
+        status.textContent = 'Failed: ' + e.message;
+        status.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function applyInterpretation() {
+    if (!lastInterpretation) return;
+    const interp = lastInterpretation;
+    const spec = interp.demographic_spec || {};
+
+    // Set panel basics.
+    if (interp.name) document.getElementById('build-name').value = interp.name;
+    if (interp.country) document.getElementById('build-country').value = interp.country;
+    if (interp.panel_size) document.getElementById('build-count').value = interp.panel_size;
+
+    // Set persona guidance.
+    if (interp.persona_guidance) {
+        document.getElementById('persona-guidance').value = interp.persona_guidance;
+    }
+
+    // Merge custom_occupations and dynamics_biases into the spec for the raw JSON override.
+    const fullSpec = {...spec};
+    if (interp.custom_occupations && interp.custom_occupations.length) {
+        fullSpec.custom_occupations = interp.custom_occupations;
+    }
+    if (interp.dynamics_biases && Object.keys(interp.dynamics_biases).length) {
+        fullSpec.dynamics_biases = interp.dynamics_biases;
+    }
+
+    // Clear existing checkboxes.
+    document.querySelectorAll('.checkbox-group input[type=checkbox]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('input[type=radio][value=any]').forEach(r => r.checked = true);
+    document.getElementById('f-age-min').value = '';
+    document.getElementById('f-age-max').value = '';
+    document.getElementById('f-income-min').value = '';
+    document.getElementById('f-income-max').value = '';
+    document.getElementById('f-hh-min').value = '';
+    document.getElementById('f-hh-max').value = '';
+
+    // Apply spec values to visual filters.
+    if (spec.age_min) document.getElementById('f-age-min').value = spec.age_min;
+    if (spec.age_max) document.getElementById('f-age-max').value = spec.age_max;
+    if (spec.income_min) document.getElementById('f-income-min').value = spec.income_min;
+    if (spec.income_max) document.getElementById('f-income-max').value = spec.income_max;
+
+    function checkValues(containerId, values) {
+        if (!values) return;
+        const el = document.getElementById(containerId);
+        if (!el) return;
+        el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+            cb.checked = values.includes(cb.value);
+        });
+    }
+
+    checkValues('f-genders', spec.genders);
+    checkValues('f-education', spec.education_levels);
+    checkValues('f-employment', spec.employment_statuses);
+    checkValues('f-social-class', spec.social_classes);
+    checkValues('f-urban-rural', spec.urban_rural);
+    checkValues('f-housing', spec.housing_tenures);
+    checkValues('f-regions', spec.regions);
+    checkValues('f-religions', spec.religions);
+    checkValues('f-languages', spec.languages);
+    checkValues('f-political', spec.political_parties);
+    checkValues('f-immigration', spec.immigration_statuses);
+    checkValues('f-imm-origins', spec.immigration_origins);
+    checkValues('f-ethnicities', spec.ethnicities);
+    checkValues('f-marital', spec.marital_statuses);
+
+    if (spec.has_children === true) {
+        document.querySelector('input[name=children][value=yes]').checked = true;
+    } else if (spec.has_children === false) {
+        document.querySelector('input[name=children][value=no]').checked = true;
+    }
+
+    // Put custom_occupations and dynamics_biases into the raw JSON override
+    // so they flow through to the build pipeline.
+    const overrideFields = {};
+    if (fullSpec.custom_occupations) overrideFields.custom_occupations = fullSpec.custom_occupations;
+    if (fullSpec.dynamics_biases) overrideFields.dynamics_biases = fullSpec.dynamics_biases;
+    if (Object.keys(overrideFields).length) {
+        document.getElementById('build-spec').value = JSON.stringify(overrideFields, null, 2);
+    }
+
+    // Load country options if the country changed.
+    const currentCountry = document.getElementById('build-country').value;
+    if (currentCountry && currentCountry !== 'United Kingdom') {
+        loadCountryOptions();
+    }
+
+    openSectionsWithFilters();
+    updateSpecPreview();
+
+    // Scroll to the form.
+    document.getElementById('build-name').scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+
+// ---- Build ----
+async function startBuild() {
+    const name = document.getElementById('build-name').value.trim();
+    const country = document.getElementById('build-country').value.trim();
+    const count = parseInt(document.getElementById('build-count').value) || 100;
+    if (!name) { alert('Panel name is required'); return; }
+
+    const spec = assembleSpec();
+    const rawJson = document.getElementById('build-spec').value.trim();
+    if (rawJson) {
+        try { JSON.parse(rawJson); } catch(e) { alert('Invalid JSON in advanced override'); return; }
+    }
+
+    const simDepth = document.querySelector('input[name="sim-depth"]:checked')?.value || 'off';
+    const guidance = document.getElementById('persona-guidance').value.trim();
+    const body = {name, country, target_count: count, simulation_depth: simDepth};
+    if (Object.keys(spec).length > 0) body.demographic_spec = spec;
+    if (guidance) body.persona_guidance = guidance;
+
+    const resp = await fetch('/api/build', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    });
+    if (!resp.ok) {
+        const err = await resp.json();
+        alert(err.error || 'Build failed to start');
+        return;
+    }
+    const result = await resp.json();
+    activeBuildId = result.job_id;
+
+    const card = document.getElementById('build-status-card');
+    card.style.display = '';
+    document.getElementById('build-active-status').style.display = '';
+    document.getElementById('build-complete').style.display = 'none';
+    document.getElementById('build-error').style.display = 'none';
+    pollBuild();
+}
+
+function pollBuild() {
+    if (buildPoll) clearInterval(buildPoll);
+    buildPoll = setInterval(async () => {
+        if (!activeBuildId) return;
+        const resp = await fetch(`/api/build/${activeBuildId}`);
+        if (!resp.ok) return;
+        const job = await resp.json();
+
+        const phase = document.getElementById('build-phase');
+        const pbar = document.getElementById('build-pbar');
+        const pcount = document.getElementById('build-pcount');
+
+        const current = job.progress_current || 0;
+        const total = job.progress_total || job.target_count || 1;
+        const pct = (current / total * 100).toFixed(1);
+
+        phase.textContent = (job.progress_pass || job.status || 'working').replace(/_/g, ' ');
+        pbar.style.width = pct + '%';
+        pcount.textContent = `${current} / ${total} personas`;
+
+        if (job.status === 'complete') {
+            clearInterval(buildPoll);
+            document.getElementById('build-active-status').style.display = 'none';
+            document.getElementById('build-complete').style.display = '';
+            if (job.panel_id) {
+                document.getElementById('build-panel-link').href = `/panels/${job.panel_id}`;
+            }
+            loadHistory();
+        } else if (job.status === 'failed') {
+            clearInterval(buildPoll);
+            document.getElementById('build-active-status').style.display = 'none';
+            const errEl = document.getElementById('build-error');
+            errEl.style.display = '';
+            errEl.textContent = 'Build failed: ' + (job.error_message || 'unknown error');
+            loadHistory();
+        }
+    }, 2000);
+}
+
+async function loadHistory() {
+    const resp = await fetch('/api/build');
+    if (!resp.ok) return;
+    const jobs = await resp.json();
+    const tbody = document.getElementById('build-history');
+    tbody.innerHTML = jobs.map(j => `
+        <tr>
+            <td>${esc(j.name)}</td>
+            <td>${esc(j.country)}</td>
+            <td>${j.target_count}</td>
+            <td><span class="badge badge-${j.status === 'complete' ? 'complete' : j.status === 'failed' ? 'negative' : 'active'}">${esc(j.status)}</span></td>
+            <td>${j.progress_current || 0} / ${j.progress_total || j.target_count}</td>
+        </tr>
+    `).join('');
+}
+
+// ---- Init ----
+loadPresets();
+loadCountryOptions();
+loadHistory();
+</script>
+{% endblock %}

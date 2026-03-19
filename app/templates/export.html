@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Export{% endblock %}
+
+{% block content %}
+<h2>Export Data</h2>
+
+<div class="card">
+    <h3>Conversation Export</h3>
+    <p style="color:var(--text-muted); margin-bottom:1rem;">Export conversation data as structured training data (JSONL), analytics-ready Parquet, or aggregated CSV.</p>
+
+    <div id="conv-list" class="form-group">
+        <label>Select Conversations</label>
+        <div id="conv-checkboxes" style="max-height:300px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:0.5rem;">
+            <div class="loading">Loading conversations...</div>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="export-format">Format</label>
+        <select id="export-format">
+            <option value="jsonl">JSONL (AI Training Data)</option>
+            <option value="parquet">Parquet (Analytics)</option>
+            <option value="csv">CSV (Research Report)</option>
+        </select>
+    </div>
+
+    <div style="display:flex; gap:0.5rem;">
+        <button class="btn btn-data" onclick="exportSingle()">Export Selected</button>
+        <button class="btn btn-panel" onclick="exportBulk()">Bulk Export (JSONL)</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const panelId = '{{ panel_id }}';
+let conversations = [];
+
+async function loadConversations() {
+    const resp = await fetch(`/api/panels/${panelId}/conversations`);
+    conversations = await resp.json();
+    const container = document.getElementById('conv-checkboxes');
+
+    if (!conversations.length) {
+        container.innerHTML = '<p style="color:var(--text-muted); padding:0.5rem;">No conversations available.</p>';
+        return;
+    }
+
+    container.innerHTML = conversations.map(c => `
+        <label style="display:flex; align-items:center; gap:0.5rem; padding:0.35rem 0; cursor:pointer;">
+            <input type="checkbox" value="${c.id}" name="conv-select">
+            <span>${c.title} (${c.turn_count} turns, ${c.total_responses} responses)</span>
+        </label>
+    `).join('');
+}
+
+function getSelectedIds() {
+    return Array.from(document.querySelectorAll('input[name="conv-select"]:checked')).map(cb => cb.value);
+}
+
+function exportSingle() {
+    const ids = getSelectedIds();
+    if (ids.length !== 1) { alert('Select exactly one conversation for single export.'); return; }
+    const fmt = document.getElementById('export-format').value;
+    window.location.href = `/api/panels/${panelId}/conversations/${ids[0]}/export?format=${fmt}`;
+}
+
+async function exportBulk() {
+    const ids = getSelectedIds();
+    if (!ids.length) { alert('Select at least one conversation.'); return; }
+    const resp = await fetch('/api/export/training-data', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conversation_ids: ids})
+    });
+    if (resp.ok) {
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `training_data_${ids.length}convs.jsonl`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } else {
+        alert('Export failed.');
+    }
+}
+
+loadConversations();
+</script>
+{% endblock %}

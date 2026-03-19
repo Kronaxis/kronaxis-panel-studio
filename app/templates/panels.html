@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% block title %}Panels{% endblock %}
+
+{% block content %}
+<div class="card-header">
+    <h2>Panels</h2>
+    <button class="btn btn-primary" onclick="openCreateModal()">Create Panel</button>
+</div>
+
+<div id="panels-list" class="card-grid">
+    <div class="loading">Loading panels...</div>
+</div>
+
+<!-- Create / sub-panel modal -->
+<div id="create-modal" class="modal-overlay">
+    <div class="modal" style="max-width:640px;">
+        <h3 id="modal-title">Create Panel</h3>
+        <form id="create-form" onsubmit="createPanel(event)">
+            <input type="hidden" id="source-panel" value="">
+
+            <div class="form-group">
+                <label for="panel-name">Panel Name</label>
+                <input type="text" id="panel-name" value="New Panel" required>
+            </div>
+            <div class="form-group">
+                <label for="panel-desc">Description</label>
+                <textarea id="panel-desc" placeholder="Panel description..."></textarea>
+            </div>
+
+            <div style="border-top:1px solid var(--border); padding-top:1rem; margin-top:1rem;">
+                <h4 style="margin-bottom:0.75rem; font-size:0.9rem; color:var(--text-secondary);">Filter Criteria</h4>
+
+                <div class="form-group">
+                    <label>Regions</label>
+                    <div id="region-checkboxes" class="checkbox-grid"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="filter-town">Town / City</label>
+                    <select id="filter-town" multiple style="height:120px;">
+                    </select>
+                    <span style="font-size:0.75rem; color:var(--text-muted);">Hold Ctrl/Cmd to select multiple</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="filter-occupation">Occupation</label>
+                    <select id="filter-occupation" multiple style="height:120px;">
+                    </select>
+                    <span style="font-size:0.75rem; color:var(--text-muted);">Hold Ctrl/Cmd to select multiple</span>
+                </div>
+
+                <div class="form-group">
+                    <label>Age Range</label>
+                    <div style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="number" id="filter-age-min" placeholder="Min" min="18" max="100" style="width:80px;">
+                        <span style="color:var(--text-muted);">to</span>
+                        <input type="number" id="filter-age-max" placeholder="Max" min="18" max="100" style="width:80px;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="filter-location-search">Location Search (free text)</label>
+                    <input type="text" id="filter-location-search" placeholder="e.g. Manchester, or a postcode area">
+                </div>
+            </div>
+
+            <!-- Preview -->
+            <div id="filter-preview" style="margin:1rem 0; padding:0.75rem; background:var(--surface-2); border-radius:8px; display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span id="preview-count" style="font-weight:600;"></span>
+                    <button type="button" class="btn btn-ghost" style="font-size:0.8rem;" onclick="previewFilter()">Refresh Preview</button>
+                </div>
+                <div id="preview-detail" style="margin-top:0.5rem; font-size:0.8rem; color:var(--text-muted);"></div>
+            </div>
+
+            <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+                <button type="button" class="btn btn-panel" onclick="previewFilter()">Preview</button>
+                <button type="submit" class="btn btn-primary" id="create-btn">Create Panel</button>
+                <button type="button" class="btn btn-ghost" onclick="closeCreateModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.25rem 1rem;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: var(--surface-2);
+    border-radius: 6px;
+}
+.checkbox-grid label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0.15rem 0;
+}
+.checkbox-grid input[type="checkbox"] {
+    accent-color: var(--primary);
+}
+</style>
+<script>
+let filterOptions = null;
+
+async function loadFilterOptions(sourcePanel) {
+    const url = sourcePanel
+        ? `/api/panels/filter-options?source_panel=${sourcePanel}`
+        : '/api/panels/filter-options';
+    const resp = await fetch(url);
+    filterOptions = await resp.json();
+    populateFilterUI();
+}
+
+function populateFilterUI() {
+    if (!filterOptions) return;
+
+    // Regions as checkboxes.
+    const regionDiv = document.getElementById('region-checkboxes');
+    regionDiv.innerHTML = filterOptions.regions.map(r => `
+        <label><input type="checkbox" name="region" value="${r}"> ${r}</label>
+    `).join('');
+
+    // Towns.
+    const townSel = document.getElementById('filter-town');
+    townSel.innerHTML = filterOptions.towns.map(t =>
+        `<option value="${t}">${t}</option>`
+    ).join('');
+
+    // Occupations.
+    const occSel = document.getElementById('filter-occupation');
+    occSel.innerHTML = filterOptions.occupations.map(o =>
+        `<option value="${o}">${o}</option>`
+    ).join('');
+
+    // Age range hints.
+    document.getElementById('filter-age-min').placeholder = `Min (${filterOptions.age_min})`;
+    document.getElementById('filter-age-max').placeholder = `Max (${filterOptions.age_max})`;
+}
+
+function getSelectedFilters() {
+    const filters = {};
+
+    const regions = [...document.querySelectorAll('input[name="region"]:checked')].map(cb => cb.value);
+    if (regions.length) filters.regions = regions;
+
+    const towns = [...document.getElementById('filter-town').selectedOptions].map(o => o.value);
+    if (towns.length) filters.towns = towns;
+
+    const occs = [...document.getElementById('filter-occupation').selectedOptions].map(o => o.value);
+    if (occs.length) filters.occupations = occs;
+
+    const ageMin = document.getElementById('filter-age-min').value;
+    const ageMax = document.getElementById('filter-age-max').value;
+    if (ageMin) filters.age_min = parseInt(ageMin);
+    if (ageMax) filters.age_max = parseInt(ageMax);
+
+    const locSearch = document.getElementById('filter-location-search').value.trim();
+    if (locSearch) filters.location_search = locSearch;
+
+    return filters;
+}
+
+async function previewFilter() {
+    const filters = getSelectedFilters();
+    const sourcePanel = document.getElementById('source-panel').value || undefined;
+
+    const resp = await fetch('/api/panels/preview-filter', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filters, source_panel: sourcePanel})
+    });
+    const data = await resp.json();
+    const preview = document.getElementById('filter-preview');
+    preview.style.display = '';
+
+    document.getElementById('preview-count').textContent = `${data.count} personas match`;
+
+    let detail = '';
+    if (data.regions && Object.keys(data.regions).length) {
+        detail += 'Regions: ' + Object.entries(data.regions).map(([r, c]) => `${r} (${c})`).join(', ');
+    }
+    if (data.age_bands && Object.keys(data.age_bands).length) {
+        if (detail) detail += '<br>';
+        detail += 'Ages: ' + Object.entries(data.age_bands).map(([b, c]) => `${b}: ${c}`).join(', ');
+    }
+    document.getElementById('preview-detail').innerHTML = detail;
+}
+
+function openCreateModal(sourcePanel, sourceName) {
+    document.getElementById('source-panel').value = sourcePanel || '';
+    if (sourcePanel) {
+        document.getElementById('modal-title').textContent = `Create Sub-Panel from "${sourceName}"`;
+        document.getElementById('panel-name').value = `${sourceName} — Subset`;
+    } else {
+        document.getElementById('modal-title').textContent = 'Create Panel';
+        document.getElementById('panel-name').value = 'New Panel';
+    }
+    document.getElementById('panel-desc').value = '';
+    document.getElementById('filter-preview').style.display = 'none';
+
+    // Reset filters.
+    document.querySelectorAll('input[name="region"]').forEach(cb => cb.checked = false);
+    document.getElementById('filter-town').selectedIndex = -1;
+    document.getElementById('filter-occupation').selectedIndex = -1;
+    document.getElementById('filter-age-min').value = '';
+    document.getElementById('filter-age-max').value = '';
+    document.getElementById('filter-location-search').value = '';
+
+    loadFilterOptions(sourcePanel);
+    document.getElementById('create-modal').classList.add('active');
+}
+
+function closeCreateModal() {
+    document.getElementById('create-modal').classList.remove('active');
+}
+
+async function loadPanels() {
+    const resp = await fetch('/api/panels');
+    const panels = await resp.json();
+    const container = document.getElementById('panels-list');
+
+    if (!panels.length) {
+        container.innerHTML = '<div class="card" style="text-align:center; color: var(--text-muted);">No panels yet. Create one to get started.</div>';
+        return;
+    }
+
+    container.innerHTML = panels.map(p => `
+        <div class="card">
+            <h3><a href="/panels/${p.id}">${p.name}</a></h3>
+            <p style="color: var(--text-muted); font-size:0.85rem;">${p.description || ''}</p>
+            <div style="margin-top:0.75rem; display:flex; gap:1rem; font-size:0.85rem; color: var(--text-muted);">
+                <span>${p.persona_count || 0} personas</span>
+                <span class="badge badge-${p.status}">${p.status}</span>
+            </div>
+            <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
+                <a href="/panels/${p.id}/conversation" class="btn btn-panel" style="font-size:0.8rem;">Start Conversation</a>
+                <button class="btn btn-ghost" style="font-size:0.8rem;" onclick="openCreateModal('${p.id}', '${p.name.replace(/'/g, "\\'")}')">Create Sub-Panel</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function createPanel(e) {
+    e.preventDefault();
+    const filters = getSelectedFilters();
+    const sourcePanel = document.getElementById('source-panel').value || undefined;
+
+    const body = {
+        name: document.getElementById('panel-name').value,
+        description: document.getElementById('panel-desc').value,
+        filters: filters,
+    };
+    if (sourcePanel) body.source_panel = sourcePanel;
+
+    const btn = document.getElementById('create-btn');
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+
+    const resp = await fetch('/api/panels', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'Create Panel';
+
+    if (resp.ok) {
+        closeCreateModal();
+        loadPanels();
+    } else {
+        const err = await resp.json();
+        alert(err.error || 'Failed to create panel');
+    }
+}
+
+loadPanels();
+
+// Auto-open sub-panel modal if navigated with ?subpanel= query param.
+const urlParams = new URLSearchParams(window.location.search);
+const subpanelId = urlParams.get('subpanel');
+const subpanelName = urlParams.get('name') || 'Panel';
+if (subpanelId) {
+    openCreateModal(subpanelId, subpanelName);
+    history.replaceState(null, '', '/panels');
+}
+</script>
+{% endblock %}

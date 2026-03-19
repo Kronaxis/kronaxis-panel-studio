@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Cross-Panel Comparison{% endblock %}
+
+{% block content %}
+<h2>Cross-Panel Comparison</h2>
+<p style="color:var(--text-muted); margin-bottom:1.5rem;">Submit the same stimulus to multiple panels and compare responses side-by-side.</p>
+
+<div class="card">
+    <h3>Set Up Comparison</h3>
+    <div class="form-group">
+        <label>Select panels to compare (minimum 2)</label>
+        <div id="panel-checklist" style="max-height:200px; overflow-y:auto; padding:0.5rem; background:var(--surface); border-radius:6px; border:1px solid var(--border);"></div>
+    </div>
+    <div class="form-group">
+        <label>Stimulus</label>
+        <textarea id="compare-stimulus" rows="3" placeholder="Ask all selected panels the same question..."></textarea>
+    </div>
+    <div style="display:flex; gap:0.75rem; align-items:center;">
+        <label style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">Sample size per panel:</label>
+        <input type="number" id="compare-sample" value="20" min="1" max="5500" style="width:5rem; padding:0.25rem 0.4rem; font-size:0.85rem;">
+        <span style="font-size:0.75rem; color:var(--text-muted);">0 = all</span>
+        <button class="btn btn-primary" onclick="runComparison()" id="compare-btn">Compare</button>
+    </div>
+</div>
+
+<div id="compare-results" style="display:none; margin-top:1.5rem;">
+    <h3>Comparison Results</h3>
+    <p id="compare-waiting" style="color:var(--text-muted);">
+        <span class="pulse-dot" style="display:inline-block; vertical-align:middle; margin-right:0.5rem;"></span>
+        Runs submitted. Results will appear as each panel completes. Polling every 5 seconds...
+    </p>
+    <div id="compare-grid" class="card-grid"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let comparisonRuns = {};
+
+async function loadPanels() {
+    const resp = await fetch('/api/panels');
+    if (!resp.ok) return;
+    const panels = await resp.json();
+    const el = document.getElementById('panel-checklist');
+    el.innerHTML = panels.map(p => `
+        <label style="display:flex; align-items:center; gap:0.5rem; padding:0.35rem 0; font-size:0.85rem; cursor:pointer;">
+            <input type="checkbox" class="panel-cb" value="${p.id}">
+            <span>${p.name}</span>
+            <span style="color:var(--text-muted); font-size:0.75rem; margin-left:auto;">${p.persona_count || '?'} personas</span>
+        </label>
+    `).join('');
+}
+
+async function runComparison() {
+    const checked = document.querySelectorAll('.panel-cb:checked');
+    const panelIds = Array.from(checked).map(cb => cb.value);
+    if (panelIds.length < 2) { alert('Select at least 2 panels'); return; }
+
+    const stimulus = document.getElementById('compare-stimulus').value.trim();
+    if (!stimulus) { alert('Stimulus is required'); return; }
+
+    const sampleSize = parseInt(document.getElementById('compare-sample').value) || 0;
+    document.getElementById('compare-btn').disabled = true;
+
+    const resp = await fetch('/api/compare', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({panel_ids: panelIds, stimulus, sample_size: sampleSize})
+    });
+
+    document.getElementById('compare-btn').disabled = false;
+    if (!resp.ok) {
+        const err = await resp.json();
+        alert(err.error || 'Comparison failed');
+        return;
+    }
+
+    const result = await resp.json();
+    comparisonRuns = result.panels;
+    document.getElementById('compare-results').style.display = '';
+    document.getElementById('compare-grid').innerHTML = '';
+
+    // Create a card for each panel.
+    for (const [pid, info] of Object.entries(comparisonRuns)) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.id = `cmp-${pid}`;
+        card.innerHTML = `
+            <h3 style="font-size:0.9rem;" id="cmp-name-${pid}">Panel ${pid.slice(0,8)}...</h3>
+            <div class="pulse-dot" style="margin-bottom:0.5rem;"></div>
+            <span style="font-size:0.8rem; color:var(--text-muted);">Waiting for results...</span>
+        `;
+        document.getElementById('compare-grid').appendChild(card);
+    }
+
+    pollComparison(panelIds);
+}
+
+async function pollComparison(panelIds) {
+    // Resolve panel names.
+    const panelsResp = await fetch('/api/panels');
+    const allPanels = panelsResp.ok ? await panelsResp.json() : [];
+    const nameMap = {};
+    for (const p of allPanels) nameMap[p.id] = p.name;
+    for (const pid of panelIds) {
+        const el = document.getElementById(`cmp-name-${pid}`);
+        if (el && nameMap[pid]) el.textContent = nameMap[pid];
+    }
+
+    const interval = setInterval(async () => {
+        let allDone = true;
+        for (const [pid, info] of Object.entries(comparisonRuns)) {
+            if (info.complete) continue;
+            if (!info.run_id) continue;
+
+            const resp = await fetch(`/api/soul/panels/${pid}/runs/${info.run_id}`);
+            if (!resp.ok) {
+                // Status endpoint not ready — try again next poll.
+                allDone = false;
+                continue;
+            }
+
+            const data = await resp.json();
+            if (data.status === 'complete') {
+                info.complete = true;
+                const card = document.getElementById(`cmp-${pid}`);
+                const agg = data.aggregated || {};
+                const sentiment = agg.sentiment_breakdown || agg.sentiment || {};
+                const themes = agg.themes || agg.key_themes || [];
+                const responses = data.responses || [];
+                card.innerHTML = `
+                    <h3 style="font-size:0.9rem;">${nameMap[pid] || pid.slice(0,8)}</h3>
+                    <div style="font-size:0.85rem; margin-bottom:0.5rem;">${responses.length} responses</div>
+                    <div class="sentiment-bar" style="height:8px;">
+                        <div class="sentiment-positive" style="width:${pct(sentiment.positive, responses.length)}%"></div>
+                        <div class="sentiment-negative" style="width:${pct(sentiment.negative, responses.length)}%"></div>
+                        <div class="sentiment-neutral" style="width:${pct(sentiment.neutral, responses.length)}%"></div>
+                    </div>
+                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.35rem;">
+                        ${sentiment.positive ? `<span class="badge badge-positive">${pct(sentiment.positive, responses.length).toFixed(0)}% positive</span>` : ''}
+                        ${sentiment.negative ? `<span class="badge badge-negative">${pct(sentiment.negative, responses.length).toFixed(0)}% negative</span>` : ''}
+                        ${sentiment.neutral ? `<span class="badge badge-neutral">${pct(sentiment.neutral, responses.length).toFixed(0)}% neutral</span>` : ''}
+                    </div>
+                    ${themes.length ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem;">Themes: ${themes.slice(0,4).join(', ')}</div>` : ''}
+                `;
+            } else {
+                allDone = false;
+            }
+        }
+        if (allDone) {
+            clearInterval(interval);
+            document.getElementById('compare-waiting').style.display = 'none';
+        }
+    }, 5000);
+}
+
+function pct(val, total) {
+    if (!total || !val) return 0;
+    return (val / total) * 100;
+}
+
+loadPanels();
+</script>
+{% endblock %}

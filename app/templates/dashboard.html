@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h2>Dashboard</h2>
+
+<div class="card-grid">
+    <div class="card stat-card">
+        <div class="stat-value">{{ panel_count }}</div>
+        <div class="stat-label">Active Panels</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-value">{{ conv_count }}</div>
+        <div class="stat-label">Conversations</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-value" id="engine-status" style="font-size:0.9rem;">{{ engine_health.status if engine_health else 'unknown' }}</div>
+        <div class="stat-label">LLM Status</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Recent Conversations</h3>
+        <a href="/panels" class="btn btn-primary">New Conversation</a>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Panel</th>
+                <th>Title</th>
+                <th>Turns</th>
+                <th>Responses</th>
+                <th>Status</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for conv in recent %}
+            <tr>
+                <td>{{ conv.panel_name }}</td>
+                <td><a href="/panels/{{ conv.panel_id if conv.panel_id else '' }}/conversations/{{ conv.id }}">{{ conv.title }}</a></td>
+                <td>{{ conv.turn_count }}</td>
+                <td>{{ conv.total_responses }}</td>
+                <td><span class="badge badge-{{ conv.status }}">{{ conv.status }}</span></td>
+                <td>{{ conv.created_at.strftime('%d %b %Y %H:%M') if conv.created_at else '' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not recent %}
+            <tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No conversations yet. Create a panel and start asking questions.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

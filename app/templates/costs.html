@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Cost Dashboard{% endblock %}
+
+{% block content %}
+<h2>Cost Dashboard</h2>
+<p style="color:var(--text-muted); margin-bottom:1.5rem;">Unit economics and cost breakdown across panels and conversations.</p>
+
+<div class="card-grid" id="cost-stats">
+    <div class="card stat-card">
+        <div class="stat-value" id="cost-per-response">--</div>
+        <div class="stat-label">Cost per Response</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-value" id="cost-per-turn">--</div>
+        <div class="stat-label">Cost per Turn</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-value" id="total-cost">--</div>
+        <div class="stat-label">Total LLM Cost</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-value" id="total-responses">--</div>
+        <div class="stat-label">Total Responses</div>
+    </div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+    <div class="card">
+        <h3>Cost by Panel</h3>
+        <table>
+            <thead>
+                <tr><th>Panel</th><th>Size</th><th>Turns</th><th>Responses</th></tr>
+            </thead>
+            <tbody id="panel-costs"></tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>Daily Spend (last 30 days)</h3>
+        <div id="daily-chart" style="display:flex; align-items:flex-end; gap:2px; height:120px; padding-top:0.5rem;"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadCosts() {
+    const resp = await fetch('/api/costs/unit-economics');
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    document.getElementById('cost-per-response').textContent = '$' + data.cost_per_response.toFixed(4);
+    document.getElementById('cost-per-turn').textContent = '$' + data.cost_per_turn.toFixed(3);
+    document.getElementById('total-cost').textContent = '$' + data.total_cost.toFixed(2);
+    document.getElementById('total-responses').textContent = data.total_responses.toLocaleString();
+
+    // Panel table.
+    const tbody = document.getElementById('panel-costs');
+    tbody.innerHTML = (data.panels || []).map(p => `
+        <tr>
+            <td><a href="/panels/${p.id}">${p.name}</a></td>
+            <td>${p.panel_size || '?'}</td>
+            <td>${p.turns}</td>
+            <td>${p.responses}</td>
+        </tr>
+    `).join('') || '<tr><td colspan="4" style="color:var(--text-muted); text-align:center;">No data yet</td></tr>';
+
+    // Daily chart.
+    const daily = data.daily || [];
+    if (daily.length) {
+        const maxCost = Math.max(...daily.map(d => d.cost)) || 1;
+        const chart = document.getElementById('daily-chart');
+        chart.innerHTML = daily.map(d => {
+            const h = Math.max(2, (d.cost / maxCost) * 100);
+            const label = new Date(d.day).toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+            return `<div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end;">
+                <div style="width:100%; background:var(--forge); border-radius:2px 2px 0 0; height:${h}px;" title="$${d.cost.toFixed(3)} (${d.calls} calls)"></div>
+                <span style="font-size:0.55rem; color:var(--text-muted); margin-top:2px; writing-mode:vertical-rl; transform:rotate(180deg); height:40px; overflow:hidden;">${label}</span>
+            </div>`;
+        }).join('');
+    }
+}
+
+loadCosts();
+</script>
+{% endblock %}

@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+{% block title %}Panel Detail{% endblock %}
+
+{% block content %}
+<div id="panel-detail">
+    <div class="loading">Loading panel...</div>
+</div>
+
+<div id="conversations-section" style="display:none;">
+    <div class="card-header">
+        <h3>Conversations</h3>
+        <div style="display:flex; gap:0.5rem;">
+            <button class="btn btn-ghost" style="font-size:0.8rem;" onclick="showInjectModal()">Inject Event</button>
+            <a href="/panels/{{ panel_id }}/timeline" class="btn btn-ghost" style="font-size:0.8rem;">Timeline</a>
+            <a href="/panels/{{ panel_id }}/conjoint" class="btn btn-ghost" style="font-size:0.8rem;">Conjoint Study</a>
+            <button class="btn btn-panel" onclick="startConversation()">Start Conversation</button>
+        </div>
+    </div>
+    <div id="conversations-list" class="card">
+        <table>
+            <thead><tr><th>Title</th><th>Turns</th><th>Responses</th><th>Status</th><th>Created</th><th></th></tr></thead>
+            <tbody id="conv-tbody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const panelId = '{{ panel_id }}';
+const DYNAMICS_LABELS = {
+    D: 'Discipline', Y: 'Yielding', N: 'Novelty', A: 'Analytical',
+    M: 'Morality', I: 'Intensity', C: 'Caution', S: 'Sociability'
+};
+
+async function loadPanel() {
+    const resp = await fetch(`/api/panels/${panelId}`);
+    if (!resp.ok) { document.getElementById('panel-detail').innerHTML = '<p>Panel not found.</p>'; return; }
+    const panel = await resp.json();
+    const demo = panel.demographics || {};
+
+    function barChart(data, color, labelWidth) {
+        if (!data || !Object.keys(data).length) return '<span style="color:var(--text-muted)">No data</span>';
+        const max = Math.max(...Object.values(data), 1);
+        const lw = labelWidth || 100;
+        return Object.entries(data).map(([label, count]) => `
+            <div class="bar-row">
+                <span class="bar-label" style="width:${lw}px">${label}</span>
+                <div class="bar-track"><div class="bar-fill" style="width:${(count/max*100).toFixed(1)}%;${color ? ' background:' + color + ';' : ''}"></div></div>
+                <span class="bar-value">${count}</span>
+            </div>
+        `).join('');
+    }
+
+    // DYNAMICS-8 radar-style bar chart (0-1 scale).
+    let dynamicsChart = '';
+    if (demo.dynamics_avg && Object.keys(demo.dynamics_avg).length) {
+        dynamicsChart = Object.entries(demo.dynamics_avg).map(([dim, val]) => `
+            <div class="bar-row">
+                <span class="bar-label" style="width:100px">${DYNAMICS_LABELS[dim] || dim}</span>
+                <div class="bar-track"><div class="bar-fill" style="width:${(val*100).toFixed(1)}%; background:var(--soul);"></div></div>
+                <span class="bar-value">${val.toFixed(2)}</span>
+            </div>
+        `).join('');
+    }
+
+    document.getElementById('panel-detail').innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem;">
+            <div style="flex:1;">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <h2 id="panel-name-display">${panel.name}</h2>
+                    <button class="btn btn-ghost" style="font-size:0.75rem; padding:0.2rem 0.5rem;" onclick="renamePanel()">Rename</button>
+                </div>
+                <p style="color: var(--text-muted); margin-bottom:1.5rem;">${panel.description || ''} &mdash; ${panel.persona_count} personas</p>
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <span id="sim-badge" class="badge" style="cursor:pointer;" onclick="toggleSimulation()" title="Click to change simulation depth"></span>
+                <a href="/panels?subpanel=${panelId}&name=${encodeURIComponent(panel.name)}" class="btn btn-panel" style="white-space:nowrap;">Create Sub-Panel</a>
+            </div>
+        </div>
+
+        <div class="card-grid">
+            <div class="card">
+                <h3>Age Distribution</h3>
+                <div class="bar-chart">${barChart(demo.age_bands)}</div>
+            </div>
+            <div class="card">
+                <h3>Gender</h3>
+                <div class="bar-chart">${barChart(demo.genders, 'var(--panel)')}</div>
+            </div>
+        </div>
+        <div class="card-grid">
+            <div class="card">
+                <h3>Region Distribution</h3>
+                <div class="bar-chart">${barChart(demo.regions, 'var(--data)', 140)}</div>
+            </div>
+            <div class="card">
+                <h3>DYNAMICS-8 Average</h3>
+                <div class="bar-chart">${dynamicsChart || '<span style="color:var(--text-muted)">No data</span>'}</div>
+            </div>
+        </div>
+        <div class="card-grid">
+            <div class="card">
+                <h3>Top Occupations</h3>
+                <div class="bar-chart">${barChart(demo.occupations, 'var(--forge)', 160)}</div>
+            </div>
+            <div class="card">
+                <h3>Political Affiliation</h3>
+                <div class="bar-chart">${barChart(demo.political_parties, 'var(--info)', 140)}</div>
+            </div>
+        </div>
+    `;
+
+    // Simulation badge.
+    const simDepth = panel.simulation_depth || 'off';
+    const badge = document.getElementById('sim-badge');
+    const colours = {off: 'var(--text-muted)', fast: 'var(--data)', full: 'var(--soul)'};
+    badge.style.background = colours[simDepth] || 'var(--text-muted)';
+    badge.style.color = '#fff';
+    badge.style.padding = '0.2rem 0.6rem';
+    badge.textContent = `Simulation: ${simDepth.charAt(0).toUpperCase() + simDepth.slice(1)}`;
+
+    loadConversations();
+
+    // Load recent life events.
+    loadRecentEvents();
+}
+
+async function loadConversations() {
+    const resp = await fetch(`/api/panels/${panelId}/conversations`);
+    const convs = await resp.json();
+    document.getElementById('conversations-section').style.display = '';
+    const tbody = document.getElementById('conv-tbody');
+
+    if (!convs.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">No conversations yet.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = convs.map(c => `
+        <tr>
+            <td><a href="/panels/${panelId}/conversations/${c.id}">${c.title}</a></td>
+            <td>${c.turn_count}</td>
+            <td>${c.total_responses}</td>
+            <td><span class="badge badge-${c.status}">${c.status}</span></td>
+            <td>${new Date(c.created_at).toLocaleDateString('en-GB')}</td>
+            <td><button class="btn btn-ghost" style="font-size:0.7rem; padding:0.15rem 0.4rem;" onclick="renameConversation('${c.id}', '${c.title.replace(/'/g, "\\'")}')">Rename</button></td>
+        </tr>
+    `).join('');
+}
+
+async function startConversation() {
+    const resp = await fetch(`/api/panels/${panelId}/conversations`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title: 'New conversation'})
+    });
+    if (resp.ok) {
+        const conv = await resp.json();
+        window.location.href = `/panels/${panelId}/conversations/${conv.id}`;
+    }
+}
+
+async function renamePanel() {
+    const current = document.getElementById('panel-name-display').textContent;
+    const name = prompt('Panel name:', current);
+    if (!name || name === current) return;
+    const resp = await fetch(`/api/panels/${panelId}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name})
+    });
+    if (resp.ok) {
+        document.getElementById('panel-name-display').textContent = name;
+    }
+}
+
+async function renameConversation(convId, current) {
+    const title = prompt('Conversation title:', current);
+    if (!title || title === current) return;
+    const resp = await fetch(`/api/panels/${panelId}/conversations/${convId}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title})
+    });
+    if (resp.ok) loadConversations();
+}
+
+async function toggleSimulation() {
+    const options = ['off', 'fast', 'full'];
+    const current = document.getElementById('sim-badge').textContent.split(': ')[1].toLowerCase();
+    const next = options[(options.indexOf(current) + 1) % options.length];
+    const resp = await fetch(`/api/panels/${panelId}/simulation`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({depth: next})
+    });
+    if (resp.ok) {
+        loadPanel();
+    } else {
+        const err = await resp.json();
+        alert('Error: ' + (err.error || 'Unknown'));
+    }
+}
+
+function showInjectModal() {
+    if (document.getElementById('inject-modal')) {
+        document.getElementById('inject-modal').style.display = 'flex';
+        return;
+    }
+    const modal = document.createElement('div');
+    modal.id = 'inject-modal';
+    modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:1000;';
+    modal.innerHTML = `
+        <div class="card" style="width:500px; max-height:80vh; overflow-y:auto; padding:1.5rem;">
+            <h3 style="margin-bottom:1rem;">Inject Life Event</h3>
+            <label>Event type:
+                <select id="inj-type" style="width:100%; padding:0.4rem; margin-bottom:0.75rem;">
+                    <option value="job_loss">Job loss</option>
+                    <option value="job_change">Job change</option>
+                    <option value="health">Health event</option>
+                    <option value="financial">Financial event</option>
+                    <option value="relationship">Relationship</option>
+                    <option value="housing">Housing</option>
+                    <option value="bereavement">Bereavement</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </label>
+            <label>Description:
+                <textarea id="inj-desc" rows="3" style="width:100%; padding:0.4rem; margin-bottom:0.75rem;" placeholder="e.g. Made redundant due to company restructuring"></textarea>
+            </label>
+            <label>Target:
+                <select id="inj-target" style="width:100%; padding:0.4rem; margin-bottom:0.75rem;" onchange="document.getElementById('inj-pct-row').style.display = this.value==='random' ? '' : 'none';">
+                    <option value="all">All personas</option>
+                    <option value="random">Random percentage</option>
+                    <option value="filtered">Filtered</option>
+                </select>
+            </label>
+            <div id="inj-pct-row" style="display:none; margin-bottom:0.75rem;">
+                <label>Percentage: <input type="number" id="inj-pct" value="20" min="1" max="100" style="width:80px; padding:0.3rem;">%</label>
+            </div>
+            <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="document.getElementById('inject-modal').style.display='none';">Cancel</button>
+                <button class="btn btn-panel" onclick="submitInject()">Inject</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function submitInject() {
+    const body = {
+        event_type: document.getElementById('inj-type').value,
+        description: document.getElementById('inj-desc').value,
+        target: document.getElementById('inj-target').value,
+        target_pct: parseInt(document.getElementById('inj-pct')?.value || 100),
+        impact: {},
+    };
+    const resp = await fetch(`/api/panels/${panelId}/inject-event`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+    });
+    document.getElementById('inject-modal').style.display = 'none';
+    if (resp.ok) {
+        const result = await resp.json();
+        alert(`Event injected into ${result.personas_affected} personas.`);
+        loadRecentEvents();
+    } else {
+        const err = await resp.json();
+        alert('Error: ' + (err.error || 'Unknown'));
+    }
+}
+
+async function loadRecentEvents() {
+    const resp = await fetch(`/api/panels/${panelId}/timeline?per_page=10`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.events || data.events.length === 0) return;
+
+    // Remove existing event feed if present.
+    const existing = document.getElementById('event-feed');
+    if (existing) existing.remove();
+
+    const section = document.createElement('div');
+    section.id = 'event-feed';
+    section.className = 'card';
+    section.style.marginTop = '1rem';
+
+    const TYPE_COLOURS = {
+        job_change: '#3b82f6', health: '#ef4444', relationship: '#ec4899',
+        financial: '#22c55e', bereavement: '#1f2937', housing: '#f97316',
+        local: '#6b7280', positive_social: '#06b6d4', minor_daily: '#a3a3a3',
+    };
+
+    let html = '<div style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1rem; border-bottom:1px solid var(--border);"><h3 style="margin:0;">Recent Life Events</h3><a href="/panels/' + panelId + '/timeline" style="font-size:0.8rem;">View Full Timeline</a></div>';
+    for (const ev of data.events) {
+        const colour = TYPE_COLOURS[ev.event_type] || '#6b7280';
+        const date = ev.occurred_at ? new Date(ev.occurred_at).toLocaleDateString('en-GB', {day:'numeric', month:'short'}) : '';
+        html += `<div style="padding:0.5rem 1rem; border-bottom:1px solid var(--border); display:flex; gap:0.75rem; align-items:flex-start;">
+            <div style="width:10px; height:10px; border-radius:50%; background:${colour}; margin-top:0.35rem; flex-shrink:0;"></div>
+            <div style="flex:1; min-width:0;">
+                <div style="display:flex; justify-content:space-between;"><strong style="font-size:0.85rem;">${ev.persona_name || ''}</strong><span style="font-size:0.75rem; color:var(--text-muted);">${date}</span></div>
+                <p style="margin:0; font-size:0.8rem; color:var(--text);">${(ev.description || '').substring(0, 120)}</p>
+            </div>
+        </div>`;
+    }
+    section.innerHTML = html;
+
+    // Insert after conversations section.
+    const convSection = document.getElementById('conversations-section');
+    if (convSection) convSection.after(section);
+}
+
+loadPanel();
+</script>
+{% endblock %}
