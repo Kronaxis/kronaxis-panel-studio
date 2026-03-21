@@ -30,7 +30,7 @@ The following uses require a separate **Kronaxis Panel Studio Enterprise Licence
 
 ## Kronaxis Panel Studio Enterprise Licence
 
-**Pricing:** GBP 25,000 to GBP 50,000 per year, depending on deployment scale and persona count.
+**Pricing:** Contact contact@kronaxis.co.uk for a tailored quote based on deployment scale and persona count.
 
 **Includes:**
 
@@ -47,9 +47,9 @@ Separately from the Panel Studio licence, premium persona datasets are available
 
 | Dataset | Personas | Price |
 |---|---|---|
-| Gated tier | 5,000 | GBP 5,000/year |
-| Constituency-level (UK) | 65,000 | GBP 15,000/year |
-| Custom country panel | Configurable | GBP 25,000/year |
+| Gated tier | 5,000 | Contact us |
+| Constituency-level (UK) | 65,000 | Contact us |
+| Custom country panel | Configurable | Contact us |
 | Enterprise API access | Unlimited generation | Custom pricing |
 
 All datasets include full DYNAMICS-8 profiles, life narratives, biographical timelines, and census-weighted demographic distributions.

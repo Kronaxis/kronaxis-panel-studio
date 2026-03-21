@@ -187,7 +187,7 @@ Kronaxis Panel Studio is source-available under the [Business Source Licence 1.1
 - Deploy Panel Studio as part of a production service
 - Redistribute Panel Studio or create derivative works
 
-Commercial licences start at GBP 25,000/year and include managed cloud API, premium persona datasets, and dedicated support. Contact contact@kronaxis.co.uk.
+Commercial licences are available and include managed cloud API, premium persona datasets, and dedicated support. Contact contact@kronaxis.co.uk for pricing.
 
 ## Patents
 
