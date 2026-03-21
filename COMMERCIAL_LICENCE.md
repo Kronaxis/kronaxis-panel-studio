@@ -14,7 +14,7 @@ Kronaxis Panel Studio is distributed under the Business Source License 1.1 (BSL 
 - Use the software for internal, non-commercial purposes (research, education, evaluation, personal projects)
 - Run the software on your own infrastructure with the included 500 seed personas for non-commercial work
 
-After 4 years from each release, that version converts to the Apache License 2.0.
+After 5 years from each release, that version converts to the Apache License 2.0.
 
 No registration or payment is required for non-commercial use.
 

@@ -180,7 +180,7 @@ All configuration is via environment variables in `.env`. See [.env.example](.en
 
 ## Commercial Use
 
-Kronaxis Panel Studio is source-available under the [Business Source Licence 1.1](LICENSE). Free for internal, non-commercial use: research, education, evaluation, and personal projects. Each version converts to Apache 2.0 four years after release.
+Kronaxis Panel Studio is source-available under the [Business Source Licence 1.1](LICENSE). Free for internal, non-commercial use: research, education, evaluation, and personal projects. Each version converts to Apache 2.0 within 5 years of release.
 
 **A commercial licence is required if you:**
 - Use Panel Studio to generate revenue (directly or indirectly)
