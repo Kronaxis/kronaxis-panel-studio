@@ -19,7 +19,7 @@
 
 ## What is Panel Studio?
 
-Panel Studio replaces expensive human focus groups with thousands of AI personas that accurately represent a real population. Each persona has a unique [DYNAMICS-8](#dynamics-8) personality profile, a coherent life history, and census-weighted demographics. When you submit a stimulus (a product concept, an advertisement, a policy proposal), every persona responds from their own character, producing demographically segmented sentiment data in minutes rather than weeks.
+Panel Studio replaces expensive human focus groups with thousands of AI personas that accurately represent a real population. Each persona has a unique [DYNAMICS-8](#dynamics-8) personality profile, a coherent life history, and census weighted demographics. When you submit a stimulus (a product concept, an advertisement, a policy proposal), every persona responds from their own character, producing demographically segmented sentiment data in minutes rather than weeks.
 
 **500 pre-loaded UK personas are included.** Start running stimuli immediately after `docker-compose up`.
 
@@ -42,11 +42,12 @@ cd kronaxis-panel-studio
 cp .env.example .env
 ```
 
-Set the two mandatory values in `.env`:
+Set the mandatory values in `.env`:
 
-```
-TFS_DB_PASSWORD=your_secure_password
-FLASK_SECRET_KEY=<generate with: python3 -c "import secrets; print(secrets.token_hex(32))">
+```bash
+echo "TFS_DB_PASSWORD=your_secure_password" >> .env
+echo "FLASK_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')" >> .env
+echo "OLLAMA_MODEL=qwen2.5:3b" >> .env
 ```
 
 Then start everything:
@@ -144,7 +145,7 @@ curl "http://localhost:8090/api/panels/$PANEL_ID/conversations/$CONV_ID/export?f
 
 ## DYNAMICS-8
 
-DYNAMICS-8 is an eight-dimension personality framework purpose-built for behavioural simulation. It extends Big Five and HEXACO with two dimensions for digital and economic behaviour: Acuity (digital fluency) and Impulsivity (delay discounting). Each dimension is a continuous float from 0.0 to 1.0 with four granular facets, giving 32 behavioural parameters per persona.
+DYNAMICS-8 is an eight-dimension personality framework built for behavioural simulation. It extends Big Five and HEXACO with two dimensions for digital and economic behaviour: Acuity (digital fluency) and Impulsivity (delay discounting). Each dimension is a continuous float from 0.0 to 1.0 with four granular facets, giving 32 behavioural parameters per persona.
 
 | Code | Dimension | What It Predicts |
 |------|-----------|------------------|
@@ -161,7 +162,7 @@ The full specification is available at [lib/dynamics/DYNAMICS-8.md](lib/dynamics
 
 ## Data
 
-The 500 pre-loaded personas are the same ungated dataset available on [HuggingFace](https://huggingface.co/kronaxis). Each persona includes full demographics (age, gender, ethnicity, occupation, income, education, location), a DYNAMICS-8 profile, and a life narrative. The distribution is census-weighted against ONS 2021 data.
+The 500 pre-loaded personas are the same ungated dataset available on [HuggingFace](https://huggingface.co/kronaxis). Each persona includes full demographics (age, gender, ethnicity, occupation, income, education, location), a DYNAMICS-8 profile, and a life narrative. The distribution is census weighted against ONS 2021 data.
 
 Larger datasets (5,000+ premium personas, 65,000 constituency-level personas, custom countries) are available under commercial licence. See [COMMERCIAL_LICENCE.md](COMMERCIAL_LICENCE.md).
 

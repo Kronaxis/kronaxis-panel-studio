@@ -37,7 +37,7 @@ The following uses require a separate **Kronaxis Panel Studio Enterprise Licence
 - Managed cloud API with guaranteed uptime and SLA
 - Access to 5,000+ premium Kronaxis Imprint personas (vs 500 in the free tier)
 - DYNAMICS-8 premium reasoning with full causal trace output
-- Custom country panels (beyond the default UK census-weighted dataset)
+- Custom country panels (beyond the default UK census weighted dataset)
 - Dedicated support with guaranteed response times
 - Direct access to the Kronaxis engineering team
 
@@ -52,7 +52,7 @@ Separately from the Panel Studio licence, premium persona datasets are available
 | Custom country panel | Configurable | Contact us |
 | Enterprise API access | Unlimited generation | Custom pricing |
 
-All datasets include full DYNAMICS-8 profiles, life narratives, biographical timelines, and census-weighted demographic distributions.
+All datasets include full DYNAMICS-8 profiles, life narratives, biographical timelines, and census weighted demographic distributions.
 
 ## How to Purchase
 

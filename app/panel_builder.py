@@ -914,7 +914,7 @@ Return a JSON object with these exact top-level keys:
 - "financial": {{annual_income, housing_status, credit_score_band, savings_behaviour, price_sensitivity, risk_tolerance, financial_anxiety, debt_level}}
 - "beliefs": {{worldview_summary, core_values: [str], moral_foundations: {{care, fairness, loyalty, authority, sanctity}}}}
 - "emotional_state": {{baseline_mood, emotional_volatility, resilience_rating, stress_triggers: [str], coping_mechanisms: [str]}}
-- "relationships": [{{name, relationship, closeness, description}}] (3-5 key relationships)
+- "relationships": [{{name, relationship, strength, description}}] (3-5 key relationships)
 - "lifecycle": {{life_stage, formative_experiences: [str], aspirations_short, aspirations_long, regrets}}
 - "religious_cultural": {{faith, practice_level, cultural_identity}}
 - "memory": {{episodic: [str]}} (4-6 vivid personal memories)
