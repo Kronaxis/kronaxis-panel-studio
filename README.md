@@ -25,7 +25,7 @@ Panel Studio replaces expensive human focus groups with thousands of AI personas
 
 ## Features
 
-- **Multi-turn conversations** with follow-up questions that build on previous responses
+- **Multi turn conversations** with follow-up questions that build on previous responses
 - **Conjoint analysis** to test product attributes and price sensitivity across personality segments
 - **Focus group synthesis** that generates naturalistic group discussions from individual responses
 - **Panel builder** to create new persona panels from demographic specifications
