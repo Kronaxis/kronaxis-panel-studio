@@ -5,7 +5,7 @@
 <h1 align="center">Kronaxis Panel Studio</h1>
 
 <p align="center">
-  <strong>Synthetic consumer panels powered by personality science and local AI.</strong>
+  <strong>1,000 synthetic consumers in 30 seconds. Self-hosted. No human panelists, no recruitment, no incentive payments.</strong>
 </p>
 
 <p align="center">
@@ -19,9 +19,36 @@
 
 ## What is Panel Studio?
 
-Panel Studio replaces expensive human focus groups with thousands of AI personas that accurately represent a real population. Each persona has a unique [DYNAMICS-8](#dynamics-8) personality profile, a coherent life history, and census weighted demographics. When you submit a stimulus (a product concept, an advertisement, a policy proposal), every persona responds from their own character, producing demographically segmented sentiment data in minutes rather than weeks.
+Traditional consumer research costs £10,000–£50,000 per study, takes weeks to recruit, and pays panelists who lie or rush. Panel Studio replaces the panel with **thousands of simulated consumers**, each with a unique [DYNAMICS-8](https://github.com/Kronaxis/dynamics-8) personality, a coherent life history, and census-weighted demographics. Submit a product concept, an ad, a policy proposal — every persona responds in character, producing demographically segmented sentiment data in minutes instead of weeks.
+
+It runs entirely on your hardware via a local LLM server. Your stimuli, your sentiment data, and your derived insights stay on your machine.
 
 **500 pre-loaded UK personas are included.** Start running stimuli immediately after `docker-compose up`.
+
+## How it compares to traditional and AI consumer research
+
+| | Panel Studio | Synthetic Users / SyntheticUsers.com | Resemble.ai (synthetic data) | Traditional panel (Quester / Kantar / Nielsen) |
+|---|---|---|---|---|
+| **Cost per study** | Self-hosted: just GPU electricity | £10–50/persona; £500+/study | Subscription (varies) | £10,000–£50,000+ |
+| **Time to first response** | ~30 seconds (local LLM) | minutes (cloud) | minutes (cloud) | 1–6 weeks (recruitment + fielding) |
+| **Personality framework** | DYNAMICS-8 (Big Five + HEXACO + 2 digital-age dimensions) | proprietary | proprietary | demographic only |
+| **Demographic weighting** | Census-weighted via country builders (20 countries) | US-centric | varies | targetable but expensive |
+| **Data residency** | Fully local; nothing leaves your machine | Cloud only | Cloud only | varies |
+| **Reproducibility** | Same persona ID + same stimulus = same response | not deterministic | not deterministic | impossible (human variability) |
+| **Public falsifiable validation** | Yes — see [KPM-1 election predictions](https://github.com/Kronaxis/kpm1-election-projections) | No | No | (not the model's claim) |
+| **Source available** | ✓ (BSL 1.1) | ✗ | ✗ | ✗ |
+| **Best for** | Fast iteration, sensitive stimuli, longitudinal studies | Hosted convenience | Adjacent use case (training data) | Regulatory / publishable studies that demand human panels |
+
+If your study needs to be defensible in a regulator's eyes, run a traditional panel. For everything else — concept screening, ad pre-testing, conjoint, longitudinal sentiment tracking — Panel Studio gives you the iteration speed of code with sentiment data that's been publicly validated against real-world outcomes.
+
+## Part of the Kronaxis research stack
+
+1. [**DYNAMICS-8**](https://github.com/Kronaxis/dynamics-8) — the eight-dimension psychographic framework Panel Studio uses to score every persona
+2. **Panel Studio** (this repo) — the engine that simulates 500–65,000 DYNAMICS-tagged personas at a time
+3. [**KPM-1**](https://github.com/Kronaxis/kpm1-election-projections) — pre-registered, hash-verified election predictions (the public proof Panel Studio's outputs map to reality)
+4. [**Kronaxis Router**](https://github.com/Kronaxis/kronaxis-router) — the LLM proxy that makes running 65,000 simulated personas economically viable
+
+Each piece is independently usable; together they cover the loop from psychographic framework → simulated population → public falsifiable forecast → cost-efficient inference at scale.
 
 ## Features
 
