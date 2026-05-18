@@ -1,0 +1,49 @@
+cff-version: 1.2.0
+message: >-
+  If you use Kronaxis Panel Studio in your research, please cite the
+  underlying DYNAMICS-8 personality framework.
+type: software
+title: "Kronaxis Panel Studio — Synthetic Consumer Panel Engine"
+abstract: >-
+  Kronaxis Panel Studio generates synthetic consumer panels of 1,000+
+  simulated personas in 30 seconds, self-hosted, with no human
+  recruitment. Each persona is built on the DYNAMICS-8 personality
+  framework, a life history narrative, and census-weighted demographics.
+  The engine is validated publicly via KPM-1, the pre-registered UK
+  council election forecasting project.
+authors:
+  - family-names: "Duke"
+    given-names: "Jason"
+    affiliation: "Kronaxis Limited"
+    email: "jason@kronaxis.co.uk"
+license: CC-BY-4.0
+license-url: "https://creativecommons.org/licenses/by/4.0/"
+repository-code: "https://github.com/Kronaxis/kronaxis-panel-studio"
+keywords:
+  - "synthetic personas"
+  - "consumer research"
+  - "behavioural simulation"
+  - "market research"
+  - "DYNAMICS-8"
+  - "synthetic panels"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.19361059"
+    description: "The DYNAMICS-8 personality framework that Panel Studio personas are built on."
+  - type: doi
+    value: "10.5281/zenodo.20273978"
+    description: "The KPM v17.10 methodology paper — Panel Studio's public validation track."
+preferred-citation:
+  type: article
+  title: "DYNAMICS-8: An Eight Dimension Personality Framework for Computational Behavioural Simulation"
+  authors:
+    - family-names: "Duke"
+      given-names: "Jason"
+      affiliation: "Kronaxis Limited"
+  year: 2026
+  month: 4
+  publisher:
+    name: "Zenodo"
+  doi: "10.5281/zenodo.19361059"
+  url: "https://doi.org/10.5281/zenodo.19361059"
+  license: "CC-BY-4.0"
